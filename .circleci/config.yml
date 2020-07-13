@@ -39,6 +39,7 @@ jobs:
             - .
   test:
     executor: my-executor
+    parallelism: 4
     steps:
       - attach_workspace:
           at: .
