@@ -26,7 +26,7 @@ jobs:
             # fallback to using the latest cache if no exact match is found
             - v1-dependencies-master-
 
-      - run: ./gradlew --scan --build-cache ktlintCheck detekt dependencies classes
+      - run: ./gradlew --scan --build-cache ktlintCheck detekt dependencies compileJava compileKotlin compileTestJava compileTestKotlin
 
       - save_cache:
           paths:
