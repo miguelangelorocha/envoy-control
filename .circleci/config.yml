@@ -25,6 +25,8 @@ jobs:
             - v1-dependencies-{{ checksum "build.gradle" }}
             # fallback to using the latest cache if no exact match is found
             - v1-dependencies-
+      - restore_cache:
+          keys:
             - build-v1-{{ .Branch }}
             # fallback to master cache
             - build-v1-master
@@ -62,6 +64,8 @@ jobs:
             - v1-dependencies-{{ checksum "build.gradle" }}
             # fallback to using the latest cache if no exact match is found
             - v1-dependencies-
+      - restore_cache:
+          keys:
             - build-v1-{{ .Branch }}
             # fallback to master cache
             - build-v1-master
@@ -94,6 +98,8 @@ jobs:
             - v1-dependencies-{{ checksum "build.gradle" }}
             # fallback to using the latest cache if no exact match is found
             - v1-dependencies-
+      - restore_cache:
+          keys:
             - build-v1-{{ .Branch }}
             # fallback to master cache
             - build-v1-master
