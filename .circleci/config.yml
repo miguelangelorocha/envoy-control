@@ -31,7 +31,7 @@ jobs:
             # fallback to master cache
             - build-v2-master
 
-      - run: ./gradlew ktlintCheck detekt dependencies compileKotlin compileJava --parallel
+      - run: ./gradlew ktlintCheck detekt dependencies compileKotlin compileJava compileTestKotlin compileTestJava
 
       - save_cache:
           paths:
@@ -107,7 +107,7 @@ jobs:
             TESTFILES=$(circleci tests glob "./**/*reliability*/*Test.class" | circleci tests split --split-by=timings --timings-type=classname)
             echo ${TESTFILES}
             echo running ./gradlew clean -Penvironment=integration :envoy-control-tests:reliabilityTest -DRELIABILITY_FAILURE_DURATION_SECONDS=20 $(./map_tests.sh $TESTFILES)
-            ./gradlew clean -Penvironment=integration :envoy-control-tests:reliabilityTest -DRELIABILITY_FAILURE_DURATION_SECONDS=20 $(./map_tests.sh $TESTFILES)
+            ./gradlew -Penvironment=integration :envoy-control-tests:reliabilityTest -DRELIABILITY_FAILURE_DURATION_SECONDS=20 $(./map_tests.sh $TESTFILES)
           no_output_timeout: 20m
       - run:
           name: Save reliability test results
