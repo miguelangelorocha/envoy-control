@@ -21,6 +21,13 @@ plugins {
     id "io.gitlab.arturbosch.detekt" version "1.0.0-RC11"
 }
 
+if (hasProperty('buildScan')) {
+    buildScan {
+        termsOfServiceUrl = 'https://gradle.com/terms-of-service'
+        termsOfServiceAgree = 'yes'
+    }
+}
+
 apply plugin: 'io.codearte.nexus-staging'
 
 scmVersion {
