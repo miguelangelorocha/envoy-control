@@ -39,7 +39,7 @@ jobs:
             - .
   test:
     executor: my-executor
-    parallelism: 4
+    parallelism: 2
     steps:
       - attach_workspace:
           at: .
@@ -50,7 +50,7 @@ jobs:
       - run:
           name: unit and integration tests
           command: |
-            TESTFILES=$(circleci tests glob "./**/*Test*.kt" | circleci tests split --split-by=timings --timings-type=classname)
+            TESTFILES=$(circleci tests glob "./**/*Test*.*" | circleci tests split --split-by=timings --timings-type=classname)
             echo ${TESTFILES}
             ./run-tests-in-files.sh $TESTFILES
       - run:
@@ -66,6 +66,7 @@ jobs:
 
   resilience_test:
     executor: my-executor
+    parallelism: 2
     steps:
       - attach_workspace:
           at: .
@@ -75,7 +76,10 @@ jobs:
             - v1-dependencies-
       - run:
           name: reliability tests
-          command: ./gradlew clean -Penvironment=integration :envoy-control-tests:reliabilityTest -DRELIABILITY_FAILURE_DURATION_SECONDS=20
+          command: |
+            TESTFILES=$(circleci tests glob "./**/*reliability*/*Test*.*" | circleci tests split --split-by=timings --timings-type=classname)
+            echo ${TESTFILES}
+            ./gradlew clean -Penvironment=integration :envoy-control-tests:reliabilityTest -DRELIABILITY_FAILURE_DURATION_SECONDS=20 --tests $(./map_tests.sh $TESTFILES)
           no_output_timeout: 20m
       - run:
           name: Save reliability test results
