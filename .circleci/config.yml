@@ -22,10 +22,10 @@ jobs:
       # Download and cache dependencies
       - restore_cache:
           keys:
-            - build-v1-{{ .Branch }}
             - v1-dependencies-{{ checksum "build.gradle" }}
             # fallback to using the latest cache if no exact match is found
             - v1-dependencies-
+            - build-v1-{{ .Branch }}
 
       - run: ./gradlew ktlintCheck detekt --parallel
       - run: ./gradlew dependencies
