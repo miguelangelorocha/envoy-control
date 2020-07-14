@@ -8,7 +8,7 @@ import pl.allegro.tech.servicemesh.envoycontrol.reliability.Toxiproxy.Companion.
 import pl.allegro.tech.servicemesh.envoycontrol.reliability.Toxiproxy.Companion.externalEnvoyControl1HttpPort
 import pl.allegro.tech.servicemesh.envoycontrol.reliability.Toxiproxy.Companion.externalEnvoyControl2HttpPort
 
-internal class EnvoyControlDownInOneDc : ReliabilityTest() {
+internal class EnvoyControlDownInOneDcTest : ReliabilityTest() {
 
     companion object {
 

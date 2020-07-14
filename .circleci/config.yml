@@ -60,6 +60,7 @@ jobs:
       - restore_cache:
           keys:
             - v1-dependencies-{{ checksum "build.gradle" }}
+            # fallback to using the latest cache if no exact match is found
             - v1-dependencies-
             - build-v1-{{ .Branch }}
             # fallback to master cache
@@ -91,8 +92,11 @@ jobs:
       - restore_cache:
           keys:
             - v1-dependencies-{{ checksum "build.gradle" }}
+            # fallback to using the latest cache if no exact match is found
             - v1-dependencies-
             - build-v1-{{ .Branch }}
+            # fallback to master cache
+            - build-v1-master
       - run:
           name: reliability tests
           command: |

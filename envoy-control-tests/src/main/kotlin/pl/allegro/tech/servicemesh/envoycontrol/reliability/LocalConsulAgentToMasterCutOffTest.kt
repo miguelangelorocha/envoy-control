@@ -2,7 +2,7 @@ package pl.allegro.tech.servicemesh.envoycontrol.reliability
 
 import org.junit.jupiter.api.Test
 
-internal class LocalConsulAgentToMasterCutOff : ReliabilityTest() {
+internal class LocalConsulAgentToMasterCutOffTest : ReliabilityTest() {
 
     @Test
     fun `should register service when communication between local agent and master is restored`() {

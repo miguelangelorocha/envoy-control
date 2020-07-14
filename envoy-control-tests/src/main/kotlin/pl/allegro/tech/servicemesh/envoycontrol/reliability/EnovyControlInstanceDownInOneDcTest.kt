@@ -12,7 +12,7 @@ import pl.allegro.tech.servicemesh.envoycontrol.reliability.Toxiproxy.Companion.
 import pl.allegro.tech.servicemesh.envoycontrol.reliability.Toxiproxy.Companion.toxiproxyGrpcPort
 import pl.allegro.tech.servicemesh.envoycontrol.reliability.Toxiproxy.Companion.toxiproxyGrpcPort2
 
-internal class EnovyControlInstanceDownInOneDc : ReliabilityTest() {
+internal class EnovyControlInstanceDownInOneDcTest : ReliabilityTest() {
 
     companion object {
 
