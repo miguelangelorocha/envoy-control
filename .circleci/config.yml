@@ -26,6 +26,8 @@ jobs:
             # fallback to using the latest cache if no exact match is found
             - v1-dependencies-
             - build-v1-{{ .Branch }}
+            # fallback to master cache
+            - build-v1-master
 
       - run: ./gradlew ktlintCheck detekt --parallel
       - run: ./gradlew dependencies
@@ -39,11 +41,11 @@ jobs:
       - save_cache:
           key: build-v1-{{ .Branch }}
           paths:
-            - ~/envoy-control-core/build/
-            - ~/envoy-control-runner/build/
-            - ~/envoy-control-services/build/
-            - ~/envoy-control-source-consul/build/
-            - ~/envoy-control-source-tests/build/
+            - ~/repo/envoy-control-core/build/
+            - ~/repo/envoy-control-runner/build/
+            - ~/repo/envoy-control-services/build/
+            - ~/repo/envoy-control-source-consul/build/
+            - ~/repo/envoy-control-source-tests/build/
 
       - persist_to_workspace:
           root: .
@@ -60,6 +62,8 @@ jobs:
             - v1-dependencies-{{ checksum "build.gradle" }}
             - v1-dependencies-
             - build-v1-{{ .Branch }}
+            # fallback to master cache
+            - build-v1-master
       - run:
           name: unit and integration tests
           command: |
