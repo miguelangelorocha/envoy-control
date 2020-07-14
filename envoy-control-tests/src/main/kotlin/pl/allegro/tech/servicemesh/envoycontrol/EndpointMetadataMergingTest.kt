@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test
 import pl.allegro.tech.servicemesh.envoycontrol.config.EnvoyControlRunnerTestApp
 import pl.allegro.tech.servicemesh.envoycontrol.config.EnvoyControlTestConfiguration
 
-open class EndpointMetadataMergingTests : EnvoyControlTestConfiguration() {
+open class EndpointMetadataMergingTest : EnvoyControlTestConfiguration() {
 
     companion object {
         private val properties = mapOf(

@@ -62,8 +62,9 @@ jobs:
       - run:
           name: unit and integration tests
           command: |
-            TESTFILES=$(circleci tests glob "./**/*Test*.class" | circleci tests split --split-by=timings --timings-type=classname)
+            TESTFILES=$(circleci tests glob "./**/*Test.class" | circleci tests split --split-by=timings --timings-type=classname)
             echo ${TESTFILES}
+            echo running ./run-tests-in-files.sh $TESTFILES
             ./run-tests-in-files.sh $TESTFILES
       - run:
           name: Save test results
@@ -90,8 +91,9 @@ jobs:
       - run:
           name: reliability tests
           command: |
-            TESTFILES=$(circleci tests glob "./**/*reliability*/*Test*.class" | circleci tests split --split-by=timings --timings-type=classname)
+            TESTFILES=$(circleci tests glob "./**/*reliability*/*Test.class" | circleci tests split --split-by=timings --timings-type=classname)
             echo ${TESTFILES}
+            echo running ./gradlew clean -Penvironment=integration :envoy-control-tests:reliabilityTest -DRELIABILITY_FAILURE_DURATION_SECONDS=20 $(./map_tests.sh $TESTFILES)
             ./gradlew clean -Penvironment=integration :envoy-control-tests:reliabilityTest -DRELIABILITY_FAILURE_DURATION_SECONDS=20 $(./map_tests.sh $TESTFILES)
           no_output_timeout: 20m
       - run:
