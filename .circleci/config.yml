@@ -79,7 +79,7 @@ jobs:
           command: |
             TESTFILES=$(circleci tests glob "./**/*reliability*/*Test*.*" | circleci tests split --split-by=timings --timings-type=classname)
             echo ${TESTFILES}
-            ./gradlew clean -Penvironment=integration :envoy-control-tests:reliabilityTest -DRELIABILITY_FAILURE_DURATION_SECONDS=20 --tests $(./map_tests.sh $TESTFILES)
+            echo ./gradlew clean -Penvironment=integration :envoy-control-tests:reliabilityTest -DRELIABILITY_FAILURE_DURATION_SECONDS=20 --tests $(./map_tests.sh $TESTFILES)
           no_output_timeout: 20m
       - run:
           name: Save reliability test results
