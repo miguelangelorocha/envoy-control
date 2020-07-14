@@ -20,7 +20,7 @@ do
 
     # not using clean since on CI it should be ok
     #        ▽ :"$module":clean
-    ./gradlew :"$module":test $mapped_tests
+    ./gradlew --offline :"$module":test $mapped_tests
 
     if [ $? -ne 0 ]; then
       exit_code=1
