@@ -2,6 +2,8 @@
 
 modules=$(cat settings.gradle | grep include | cut -d " " -f 2 | cut -d "'" -f 2)
 
+exit_code=0
+
 for module in $modules
 do
   tests_to_run=()
@@ -19,5 +21,11 @@ do
     # not using clean since on CI it should be ok
     #        ▽ :"$module":clean
     ./gradlew :"$module":test $mapped_tests
+
+    if [ $? -ne 0 ]; then
+      exit_code=1
+    fi
   fi
 done
+
+exit $exit_code
