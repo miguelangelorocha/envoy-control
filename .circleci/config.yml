@@ -22,31 +22,16 @@ jobs:
       # Download and cache dependencies
       - restore_cache:
           keys:
-            - v1-dependencies-{{ checksum "build.gradle" }}
+            - v1-dependencies-{{ .Branch }}-{{ checksum "build.gradle" }}
             # fallback to using the latest cache if no exact match is found
-            - v1-dependencies-
-      - restore_cache:
-          keys:
-            - build-v2-{{ .Branch }}
-            # fallback to master cache
-            - build-v2-master
+            - v1-dependencies-master-
 
-      - run: ./gradlew --scan ktlintCheck detekt dependencies classes
+      - run: ./gradlew --scan --build-cache ktlintCheck detekt dependencies classes
 
       - save_cache:
           paths:
             - ~/.gradle
           key: v1-dependencies-{{ checksum "build.gradle" }}
-
-      - save_cache:
-          key: build-v2-{{ .Branch }}
-          paths:
-            - ~/repo/build/
-            - ~/repo/envoy-control-core/build/
-            - ~/repo/envoy-control-runner/build/
-            - ~/repo/envoy-control-services/build/
-            - ~/repo/envoy-control-source-consul/build/
-            - ~/repo/envoy-control-source-tests/build/
 
       - persist_to_workspace:
           root: .
@@ -60,14 +45,10 @@ jobs:
           at: .
       - restore_cache:
           keys:
-            - v1-dependencies-{{ checksum "build.gradle" }}
+            - v1-dependencies-{{ .Branch }}-{{ checksum "build.gradle" }}
             # fallback to using the latest cache if no exact match is found
-            - v1-dependencies-
-      - restore_cache:
-          keys:
-            - build-v2-{{ .Branch }}
-            # fallback to master cache
-            - build-v2-master
+            - v1-dependencies-master-
+
       - run:
           name: unit and integration tests
           command: |
@@ -93,20 +74,15 @@ jobs:
           at: .
       - restore_cache:
           keys:
-            - v1-dependencies-{{ checksum "build.gradle" }}
+            - v1-dependencies-{{ .Branch }}-{{ checksum "build.gradle" }}
             # fallback to using the latest cache if no exact match is found
-            - v1-dependencies-
-      - restore_cache:
-          keys:
-            - build-v2-{{ .Branch }}
-            # fallback to master cache
-            - build-v2-master
+            - v1-dependencies-master-
       - run:
           name: reliability tests
           command: |
             TESTFILES=$(circleci tests glob "./**/*reliability*/*Test.class" | circleci tests split --split-by=timings --timings-type=classname)
             echo ${TESTFILES}
-            ./gradlew --scan -Penvironment=integration :envoy-control-tests:reliabilityTest -DRELIABILITY_FAILURE_DURATION_SECONDS=20 $(./map_tests.sh $TESTFILES)
+            ./gradlew --scan --build-cache -Penvironment=integration :envoy-control-tests:reliabilityTest -DRELIABILITY_FAILURE_DURATION_SECONDS=20 $(./map_tests.sh $TESTFILES)
           no_output_timeout: 20m
       - run:
           name: Save reliability test results
