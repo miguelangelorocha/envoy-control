@@ -18,6 +18,6 @@ do
 
     # not using clean since on CI it should be ok
     #        ▽ :"$module":clean
-    echo ./gradlew :"$module":test $mapped_tests
+    ./gradlew :"$module":test $mapped_tests
   fi
 done
