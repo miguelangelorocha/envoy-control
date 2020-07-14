@@ -26,7 +26,9 @@ jobs:
             # fallback to using the latest cache if no exact match is found
             - v1-dependencies-
 
+      - run: ./gradlew ktlintCheck detekt
       - run: ./gradlew dependencies
+      - run: ./gradlew assemble
 
       - save_cache:
           paths:
@@ -36,7 +38,11 @@ jobs:
       - save_cache:
           key: build-v1-{{ .Branch }}-{{ .Revision }}
           paths:
-            - "~/**/build/"
+            - ~/envoy-control-core/build/
+            - ~/envoy-control-runner/build/
+            - ~/envoy-control-services/build/
+            - ~/envoy-control-source-consul/build/
+            - ~/envoy-control-source-tests/build/
 
       - persist_to_workspace:
           root: .
