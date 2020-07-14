@@ -11,24 +11,24 @@ function map_tests() {
   done
 }
 
-for file in "$@"
+modules=$(cat settings.gradle | grep include | cut -d " " -f 2 | cut -d "'" -f 2)
+
+for module in $modules
 do
-    if [[ $file == *"envoy-control-core"* ]]; then
-      core_tests+=($file)
-    elif [[ $file == *"envoy-control-tests"* ]]; then
-      tests+=($file)
-    fi
+  tests_to_run=()
+  for file in "$@"
+  do
+      if [[ $file == *"$module"* ]]; then
+        tests_to_run+=($file)
+      fi
+  done
+
+  if [[ -n "$tests_to_run" ]]; then
+    echo "running $module tests"
+    mapped_tests=$(map_tests "${tests_to_run[@]}")
+
+    # not using clean since on CI it should be ok
+    #         ▽ :"$module":clean
+    ./gradlew  :"$module":test $mapped_tests
+  fi
 done
-
-core_tests_args=$(map_tests "${core_tests[@]}")
-tests_args=$(map_tests "${tests[@]}")
-
-if [[ -n "$core_tests_args" ]]; then
-  echo "running core tests"
-  ./gradlew :envoy-control-core:clean :envoy-control-core:test $core_tests_args
-fi
-
-if [[ -n "$tests_args" ]]; then
-  echo "running tests"
-  ./gradlew :envoy-control-tests:clean :envoy-control-tests:test $tests_args
-fi
