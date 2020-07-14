@@ -31,7 +31,7 @@ jobs:
             # fallback to master cache
             - build-v2-master
 
-      - run: ./gradlew ktlintCheck detekt dependencies classes
+      - run: ./gradlew --scan ktlintCheck detekt dependencies classes
 
       - save_cache:
           paths:
