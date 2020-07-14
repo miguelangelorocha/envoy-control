@@ -28,7 +28,7 @@ do
     mapped_tests=$(map_tests "${tests_to_run[@]}")
 
     # not using clean since on CI it should be ok
-    #         ▽ :"$module":clean
-    ./gradlew  :"$module":test $mapped_tests
+    #        ▽ :"$module":clean
+    ./gradlew :"$module":test $mapped_tests
   fi
 done
