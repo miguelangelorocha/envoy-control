@@ -57,7 +57,9 @@ internal class TlsBasedAuthenticationTest : EnvoyControlTestConfiguration() {
         fun setupTest() {
             setup(appFactoryForEc1 = { consulPort ->
                 EnvoyControlRunnerTestApp(properties = properties, consulPort = consulPort)
-            }, envoyConfig = echo1EnvoyConfig, secondEnvoyConfig = echo2EnvoyConfig, envoys = 2)
+            },
+                    envoyImage = "envoyproxy/envoy-alpine-dev:b7bef67c256090919a4585a1a06c42f15d640a09",
+                    envoyConfig = echo1EnvoyConfig, secondEnvoyConfig = echo2EnvoyConfig, envoys = 2)
         }
 
         private fun registerEcho2WithEnvoyOnIngress() {
