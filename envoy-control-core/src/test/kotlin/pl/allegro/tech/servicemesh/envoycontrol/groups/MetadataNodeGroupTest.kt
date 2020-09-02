@@ -16,6 +16,7 @@ import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import pl.allegro.tech.servicemesh.envoycontrol.snapshot.resource.listeners.filters.AccessLogFilterFactory
+import pl.allegro.tech.servicemesh.envoycontrol.snapshot.wildcardServiceDependency
 
 class MetadataNodeGroupTest {
     val accessLogFilterFactory = AccessLogFilterFactory()
@@ -35,7 +36,9 @@ class MetadataNodeGroupTest {
             // because service may define different settings for different dependencies (for example endpoints, which
             // will be implemented in https://github.com/allegro/envoy-control/issues/6
                 communicationMode = XDS,
-                proxySettings = ProxySettings().with(serviceDependencies = serviceDependencies("*", "a", "b", "c"))
+                proxySettings = ProxySettings().with(serviceDependencies = serviceDependencies("a", "b", "c"),
+                    wildCardServiceDependency = wildcardServiceDependency()
+                )
         ))
     }
 
@@ -87,7 +90,7 @@ class MetadataNodeGroupTest {
         assertThat(group).isEqualTo(
             AllServicesGroup(
                     communicationMode = ADS,
-                    proxySettings = ProxySettings().with(serviceDependencies = serviceDependencies("*"))
+                    proxySettings = ProxySettings().with(wildCardServiceDependency = wildcardServiceDependency())
             )
         )
     }
@@ -193,7 +196,7 @@ class MetadataNodeGroupTest {
         assertThat(group).isEqualTo(AllServicesGroup(
                 communicationMode = XDS,
                 serviceName = "app1",
-                proxySettings = addedProxySettings.with(serviceDependencies = serviceDependencies("*"))
+                proxySettings = addedProxySettings.with(wildCardServiceDependency = wildcardServiceDependency())
         ))
     }
 

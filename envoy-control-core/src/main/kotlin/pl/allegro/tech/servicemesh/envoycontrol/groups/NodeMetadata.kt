@@ -47,8 +47,6 @@ data class ProxySettings(
         outgoing = proto?.field("outgoing").toOutgoing(properties)
     )
 
-    fun isEmpty() = this == ProxySettings()
-
     fun withIncomingPermissionsDisabled(): ProxySettings = copy(
         incoming = incoming.copy(
             permissionsEnabled = false,
@@ -99,6 +97,9 @@ fun Value.toDependency(properties: SnapshotProperties = SnapshotProperties()): D
             throw NodeMetadataValidationException(
                 "Define either 'service' or 'domain' as an outgoing dependency"
             )
+        service == properties.outgoingPermissions.allServicesDependencies.identifier -> WildCardServiceDependency(
+            settings
+        )
         service != null -> ServiceDependency(service, settings)
         domain.orEmpty().startsWith("http://") -> DomainDependency(domain.orEmpty(), settings)
         domain.orEmpty().startsWith("https://") -> DomainDependency(domain.orEmpty(), settings)
@@ -228,8 +229,6 @@ data class Incoming(
 data class Outgoing(
     val dependencies: List<Dependency> = emptyList()
 ) {
-    fun containsDependencyForService(service: String) = serviceDependencies.containsKey(service)
-
     // not declared in primary constructor to exclude from equals(), copy(), etc.
     private val domainDependencies: Map<String, DomainDependency> = dependencies
         .filterIsInstance<DomainDependency>()
@@ -241,9 +240,15 @@ data class Outgoing(
         .map { it.service to it }
         .toMap()
 
+//  TODO handle multiple
+    private val wildcardServiceDependency: WildCardServiceDependency? = dependencies
+        .filterIsInstance<WildCardServiceDependency>().firstOrNull()
+
     fun getDomainDependencies(): Collection<DomainDependency> = domainDependencies.values
 
     fun getServiceDependencies(): Collection<ServiceDependency> = serviceDependencies.values
+
+    fun getWildcardServiceDependency() = wildcardServiceDependency
 
     data class TimeoutPolicy(
         val idleTimeout: Duration?,
@@ -255,6 +260,10 @@ interface Dependency
 
 data class ServiceDependency(
     val service: String,
+    val settings: DependencySettings = DependencySettings()
+) : Dependency
+
+data class WildCardServiceDependency(
     val settings: DependencySettings = DependencySettings()
 ) : Dependency
 

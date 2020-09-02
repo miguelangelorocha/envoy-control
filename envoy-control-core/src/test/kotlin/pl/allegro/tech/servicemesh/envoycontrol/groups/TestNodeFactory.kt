@@ -56,9 +56,9 @@ val addedProxySettings = ProxySettings(Incoming(
     permissionsEnabled = true
 ))
 
-fun ProxySettings.with(serviceDependencies: Set<ServiceDependency> = emptySet(), domainDependencies: Set<DomainDependency> = emptySet()) = copy(
+fun ProxySettings.with(serviceDependencies: Set<ServiceDependency> = emptySet(), domainDependencies: Set<DomainDependency> = emptySet(), wildCardServiceDependency: WildCardServiceDependency? = null) = copy(
     outgoing = Outgoing(
-        dependencies = serviceDependencies.toList() + domainDependencies.toList()
+        dependencies = listOfNotNull(wildCardServiceDependency) + serviceDependencies.toList() + domainDependencies.toList()
     )
 )
 

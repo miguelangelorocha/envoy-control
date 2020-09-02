@@ -19,10 +19,10 @@ import pl.allegro.tech.servicemesh.envoycontrol.services.MultiClusterState
 import pl.allegro.tech.servicemesh.envoycontrol.services.ServiceInstance
 import pl.allegro.tech.servicemesh.envoycontrol.services.ServiceInstances
 import pl.allegro.tech.servicemesh.envoycontrol.snapshot.resource.clusters.EnvoyClustersFactory
-import pl.allegro.tech.servicemesh.envoycontrol.snapshot.resource.routes.EnvoyEgressRoutesFactory
 import pl.allegro.tech.servicemesh.envoycontrol.snapshot.resource.endpoints.EnvoyEndpointsFactory
-import pl.allegro.tech.servicemesh.envoycontrol.snapshot.resource.routes.EnvoyIngressRoutesFactory
 import pl.allegro.tech.servicemesh.envoycontrol.snapshot.resource.listeners.EnvoyListenersFactory
+import pl.allegro.tech.servicemesh.envoycontrol.snapshot.resource.routes.EnvoyEgressRoutesFactory
+import pl.allegro.tech.servicemesh.envoycontrol.snapshot.resource.routes.EnvoyIngressRoutesFactory
 
 class EnvoySnapshotFactory(
     private val ingressRoutesFactory: EnvoyIngressRoutesFactory,
@@ -174,20 +174,30 @@ class EnvoySnapshotFactory(
         group: Group,
         globalSnapshot: GlobalSnapshot
     ): Collection<RouteSpecification> {
+        val definedServicesRoutes = group.proxySettings.outgoing.getServiceDependencies().map {
+            RouteSpecification(
+                clusterName = it.service,
+                routeDomain = it.service,
+                settings = it.settings
+            )
+        }
         return when (group) {
-            is ServicesGroup -> group.proxySettings.outgoing.getServiceDependencies().map {
-                RouteSpecification(
-                    clusterName = it.service,
-                    routeDomain = it.service,
-                    settings = it.settings
-                )
+            is ServicesGroup -> {
+                definedServicesRoutes
             }
-            is AllServicesGroup -> globalSnapshot.allServicesNames.map {
-                RouteSpecification(
-                    clusterName = it,
-                    routeDomain = it,
-                    settings = defaultDependencySettings
-                )
+            is AllServicesGroup -> {
+//TODO refactor - getWildcardServiceDependency cannot be null
+                val allServiceDependency =
+                    group.proxySettings.outgoing.getWildcardServiceDependency()?.settings ?: defaultDependencySettings
+                val names = group.proxySettings.outgoing.getServiceDependencies().map { it.service }.toSet()
+                val allServicesRoutes = globalSnapshot.allServicesNames.subtract(names).map {
+                    RouteSpecification(
+                        clusterName = it,
+                        routeDomain = it,
+                        settings = allServiceDependency
+                    )
+                }
+                allServicesRoutes + definedServicesRoutes
             }
         }
     }

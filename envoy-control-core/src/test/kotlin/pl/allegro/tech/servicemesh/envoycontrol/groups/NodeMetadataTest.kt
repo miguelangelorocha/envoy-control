@@ -122,7 +122,7 @@ class NodeMetadataTest {
     }
 
     @Test
-    fun `should check if dependency for service is defined`() {
+    fun `should get wildcardServiceDependency when it's defined`() {
         // given
         val outgoing = Outgoing(listOf(ServiceDependency(
             service = "service-first",
@@ -130,8 +130,18 @@ class NodeMetadataTest {
         )))
 
         // expects
-        assertThat(outgoing.containsDependencyForService("service-first")).isTrue()
-        assertThat(outgoing.containsDependencyForService("service-second")).isFalse()
+        assertThat(outgoing.getWildcardServiceDependency()).isNull()
+    }
+
+    @Test
+    fun `should check if dependency for service is defined2`() {
+        // given
+        val outgoing = Outgoing(listOf(WildCardServiceDependency(
+            settings = DependencySettings(handleInternalRedirect = true)
+        )))
+
+        // expects
+        assertThat(outgoing.getWildcardServiceDependency()).isNotNull
     }
 
     @Test

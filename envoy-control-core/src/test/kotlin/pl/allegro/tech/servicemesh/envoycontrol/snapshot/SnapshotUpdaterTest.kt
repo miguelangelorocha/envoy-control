@@ -25,6 +25,7 @@ import pl.allegro.tech.servicemesh.envoycontrol.groups.Outgoing
 import pl.allegro.tech.servicemesh.envoycontrol.groups.ProxySettings
 import pl.allegro.tech.servicemesh.envoycontrol.groups.ServiceDependency
 import pl.allegro.tech.servicemesh.envoycontrol.groups.ServicesGroup
+import pl.allegro.tech.servicemesh.envoycontrol.groups.WildCardServiceDependency
 import pl.allegro.tech.servicemesh.envoycontrol.groups.with
 import pl.allegro.tech.servicemesh.envoycontrol.services.Locality
 import pl.allegro.tech.servicemesh.envoycontrol.services.ClusterState
@@ -558,6 +559,14 @@ fun serviceDependencies(vararg serviceNames: String): Set<ServiceDependency> =
             ))
         )
     }.toSet()
+
+fun wildcardServiceDependency(): WildCardServiceDependency =
+        WildCardServiceDependency(
+            settings = DependencySettings(timeoutPolicy = Outgoing.TimeoutPolicy(
+                idleTimeout = Durations.fromSeconds(120L),
+                requestTimeout = Durations.fromSeconds(120L)
+            ))
+        )
 
 fun domainDependencies(vararg serviceNames: String): Set<DomainDependency> =
     serviceNames.map {
