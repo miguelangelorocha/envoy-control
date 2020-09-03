@@ -186,7 +186,7 @@ class EnvoySnapshotFactory(
                 definedServicesRoutes
             }
             is AllServicesGroup -> {
-//TODO refactor - getWildcardServiceDependency cannot be null
+// TODO refactor - getWildcardServiceDependency cannot be null
                 val allServiceDependency =
                     group.proxySettings.outgoing.getWildcardServiceDependency()?.settings ?: defaultDependencySettings
                 val names = group.proxySettings.outgoing.getServiceDependencies().map { it.service }.toSet()
