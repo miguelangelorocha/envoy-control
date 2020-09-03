@@ -120,7 +120,7 @@ class NodeMetadataTest {
             .isEqualTo("Unsupported protocol for domain dependency for domain ftp://domain")
         assertThat(exception.status.code).isEqualTo(Status.Code.INVALID_ARGUMENT)
     }
-
+    //TODO move to NodeMetadataTest
     @Test
     fun `should get wildcardServiceDependency when it's defined`() {
         // given
@@ -134,17 +134,6 @@ class NodeMetadataTest {
     }
 
     @Test
-    fun `should check if dependency for service is defined2`() {
-        // given
-        val outgoing = Outgoing(listOf(WildCardServiceDependency(
-            settings = DependencySettings(handleInternalRedirect = true)
-        )))
-
-        // expects
-        assertThat(outgoing.getWildcardServiceDependency()).isNotNull
-    }
-
-    @Test
     fun `should accept domain dependency`() {
         // given
         val proto = outgoingDependencyProto(domain = "http://domain")
@@ -153,6 +142,18 @@ class NodeMetadataTest {
         val dependency = proto.toDependency()
         assertThat(dependency).isInstanceOf(DomainDependency::class.java)
         assertThat((dependency as DomainDependency).domain).isEqualTo("http://domain")
+    }
+
+//TODO add test for each combination
+    @Test
+    fun `should accept all service dependency with idleTimeout and requestTimeout defined`() {
+        // given
+        val proto = outgoingDependencyProto(service = "*", idleTimeout = "10s", requestTimeout = "10s")
+        val dependency = proto.toDependency() as WildCardServiceDependency
+
+        // expects
+        assertThat(dependency.settings.timeoutPolicy!!.idleTimeout).isEqualTo(Durations.fromSeconds(10L))
+        assertThat(dependency.settings.timeoutPolicy!!.requestTimeout).isEqualTo(Durations.fromSeconds(10L))
     }
 
     @Test
