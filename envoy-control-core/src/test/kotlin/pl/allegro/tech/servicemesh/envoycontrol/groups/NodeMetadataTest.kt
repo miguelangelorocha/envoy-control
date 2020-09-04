@@ -272,7 +272,7 @@ class NodeMetadataTest {
     @Test
     fun `should throw exception when there are multiple wildcard dependencies`() {
         // given
-        val proto = outgoingDependenciesProto(serviceDependencies = listOf("*","*","a"))
+        val proto = outgoingDependenciesProto(serviceDependencies = listOf("*", "*", "a"))
 
         // expects
         val exception = assertThrows<NodeMetadataValidationException> {
