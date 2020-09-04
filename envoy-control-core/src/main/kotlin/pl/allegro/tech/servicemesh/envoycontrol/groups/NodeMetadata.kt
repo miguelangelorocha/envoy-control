@@ -68,13 +68,25 @@ private fun getCommunicationMode(proto: Value?): CommunicationMode {
 }
 
 fun Value?.toStatusCodeFilter(accessLogFilterFactory: AccessLogFilterFactory):
-        AccessLogFilterSettings.StatusCodeFilterSettings? = this?.stringValue?.let {
+    AccessLogFilterSettings.StatusCodeFilterSettings? = this?.stringValue?.let {
     accessLogFilterFactory.parseStatusCodeFilter(it.toUpperCase())
 }
 
-private fun Value?.toOutgoing(properties: SnapshotProperties): Outgoing {
+fun Value?.toOutgoing(properties: SnapshotProperties): Outgoing {
+    val dependencies = this?.field("dependencies")?.list().orEmpty().map { it.toDependency(properties) }
+    val serviceDependencies = dependencies.filterIsInstance<WildCardServiceDependency>()
+    val domainDependencies = dependencies.filterIsInstance<ServiceDependency>()
+    val wildcardDependency = dependencies.filterIsInstance<DomainDependency>()
+
+    if (serviceDependencies.size > 1) {
+        throw NodeMetadataValidationException(
+            "Define at most one 'all services' as an outgoing dependency"
+        )
+    }
     return Outgoing(
-        dependencies = this?.field("dependencies")?.list().orEmpty().map { it.toDependency(properties) }
+        serviceDependencies = domainDependencies,
+        domainDependencies = wildcardDependency,
+        wildcardServiceDependency = serviceDependencies.firstOrNull()
     )
 }
 
@@ -124,11 +136,13 @@ fun Value?.toIncoming(): Incoming {
 
 fun Value?.toUnlistedPolicy() = this?.stringValue
     ?.takeIf { it.isNotEmpty() }
-    ?.let { when (it) {
-        "log" -> Incoming.UnlistedPolicy.LOG
-        "blockAndLog" -> Incoming.UnlistedPolicy.BLOCKANDLOG
-        else -> throw NodeMetadataValidationException("Invalid UnlistedPolicy value: $it")
-    } }
+    ?.let {
+        when (it) {
+            "log" -> Incoming.UnlistedPolicy.LOG
+            "blockAndLog" -> Incoming.UnlistedPolicy.BLOCKANDLOG
+            else -> throw NodeMetadataValidationException("Invalid UnlistedPolicy value: $it")
+        }
+    }
     ?: Incoming.UnlistedPolicy.BLOCKANDLOG
 
 fun Value?.toHealthCheck(): HealthCheck {
@@ -156,7 +170,7 @@ fun Value.toIncomingEndpoint(): IncomingEndpoint {
     return when {
         path != null -> IncomingEndpoint(path, PathMatchingType.PATH, methods, clients, unlistedClientsPolicy)
         pathPrefix != null -> IncomingEndpoint(
-                pathPrefix, PathMatchingType.PATH_PREFIX, methods, clients, unlistedClientsPolicy
+            pathPrefix, PathMatchingType.PATH_PREFIX, methods, clients, unlistedClientsPolicy
         )
         else -> throw NodeMetadataValidationException("One of 'path' or 'pathPrefix' field is required")
     }
@@ -180,9 +194,9 @@ private fun Value?.toIncomingTimeoutPolicy(): Incoming.TimeoutPolicy {
 }
 
 private fun Value?.toOutgoingTimeoutPolicy(properties: SnapshotProperties): Outgoing.TimeoutPolicy {
-    val idleTimeout: Duration? = this?.field("idleTimeout")?.toDuration()
+    val idleTimeout = this?.field("idleTimeout")?.toDuration()
         ?: Durations.fromMillis(properties.egress.commonHttp.idleTimeout.toMillis())
-    val requestTimeout: Duration? = this?.field("requestTimeout")?.toDuration()
+    val requestTimeout = this?.field("requestTimeout")?.toDuration()
         ?: Durations.fromMillis(properties.egress.commonHttp.requestTimeout.toMillis())
 
     return Outgoing.TimeoutPolicy(idleTimeout, requestTimeout)
@@ -191,8 +205,10 @@ private fun Value?.toOutgoingTimeoutPolicy(properties: SnapshotProperties): Outg
 @Suppress("SwallowedException")
 fun Value.toDuration(): Duration? {
     return when (this.kindCase) {
-        Value.KindCase.NUMBER_VALUE -> throw NodeMetadataValidationException("Timeout definition has number format" +
-            " but should be in string format and ends with 's'")
+        Value.KindCase.NUMBER_VALUE -> throw NodeMetadataValidationException(
+            "Timeout definition has number format" +
+                " but should be in string format and ends with 's'"
+        )
         Value.KindCase.STRING_VALUE -> {
             try {
                 this.stringValue?.takeIf { it.isNotBlank() }?.let { Durations.parse(it) }
@@ -227,32 +243,14 @@ data class Incoming(
 }
 
 data class Outgoing(
-    val dependencies: List<Dependency> = emptyList()
+    val serviceDependencies: List<ServiceDependency> = emptyList(),
+    val domainDependencies: List<DomainDependency> = emptyList(),
+    val wildcardServiceDependency: WildCardServiceDependency? = null
 ) {
-    // not declared in primary constructor to exclude from equals(), copy(), etc.
-    private val domainDependencies: Map<String, DomainDependency> = dependencies
-        .filterIsInstance<DomainDependency>()
-        .map { it.domain to it }
-        .toMap()
-
-    private val serviceDependencies: Map<String, ServiceDependency> = dependencies
-        .filterIsInstance<ServiceDependency>()
-        .map { it.service to it }
-        .toMap()
-
-//  TODO handle multiple
-    private val wildcardServiceDependency: WildCardServiceDependency? = dependencies
-        .filterIsInstance<WildCardServiceDependency>().firstOrNull()
-
-    fun getDomainDependencies(): Collection<DomainDependency> = domainDependencies.values
-
-    fun getServiceDependencies(): Collection<ServiceDependency> = serviceDependencies.values
-
-    fun getWildcardServiceDependency() = wildcardServiceDependency
 
     data class TimeoutPolicy(
-        val idleTimeout: Duration?,
-        val requestTimeout: Duration?
+        val idleTimeout: Duration,
+        val requestTimeout: Duration
     )
 }
 

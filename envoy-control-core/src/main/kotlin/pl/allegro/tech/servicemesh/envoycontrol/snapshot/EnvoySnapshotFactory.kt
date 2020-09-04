@@ -161,7 +161,7 @@ class EnvoySnapshotFactory(
     }
 
     private fun getDomainRouteSpecifications(group: Group): List<RouteSpecification> {
-        return group.proxySettings.outgoing.getDomainDependencies().map {
+        return group.proxySettings.outgoing.domainDependencies.map {
             RouteSpecification(
                 clusterName = it.getClusterName(),
                 routeDomain = it.getRouteDomain(),
@@ -174,7 +174,7 @@ class EnvoySnapshotFactory(
         group: Group,
         globalSnapshot: GlobalSnapshot
     ): Collection<RouteSpecification> {
-        val definedServicesRoutes = group.proxySettings.outgoing.getServiceDependencies().map {
+        val definedServicesRoutes = group.proxySettings.outgoing.serviceDependencies.map {
             RouteSpecification(
                 clusterName = it.service,
                 routeDomain = it.service,
@@ -188,8 +188,8 @@ class EnvoySnapshotFactory(
             is AllServicesGroup -> {
 // TODO refactor - getWildcardServiceDependency cannot be null
                 val allServiceDependency =
-                    group.proxySettings.outgoing.getWildcardServiceDependency()?.settings ?: defaultDependencySettings
-                val names = group.proxySettings.outgoing.getServiceDependencies().map { it.service }.toSet()
+                    group.proxySettings.outgoing.wildcardServiceDependency?.settings ?: defaultDependencySettings
+                val names = group.proxySettings.outgoing.serviceDependencies.map { it.service }.toSet()
                 val allServicesRoutes = globalSnapshot.allServicesNames.subtract(names).map {
                     RouteSpecification(
                         clusterName = it,

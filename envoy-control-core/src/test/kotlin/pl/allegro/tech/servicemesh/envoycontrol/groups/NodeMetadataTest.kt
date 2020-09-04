@@ -10,6 +10,7 @@ import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.MethodSource
+import pl.allegro.tech.servicemesh.envoycontrol.snapshot.SnapshotProperties
 import pl.allegro.tech.servicemesh.envoycontrol.snapshot.resource.listeners.filters.AccessLogFilterFactory
 
 @Suppress("LargeClass")
@@ -120,18 +121,6 @@ class NodeMetadataTest {
             .isEqualTo("Unsupported protocol for domain dependency for domain ftp://domain")
         assertThat(exception.status.code).isEqualTo(Status.Code.INVALID_ARGUMENT)
     }
-    //TODO move to NodeMetadataTest
-    @Test
-    fun `should get wildcardServiceDependency when it's defined`() {
-        // given
-        val outgoing = Outgoing(listOf(ServiceDependency(
-            service = "service-first",
-            settings = DependencySettings(handleInternalRedirect = true)
-        )))
-
-        // expects
-        assertThat(outgoing.getWildcardServiceDependency()).isNull()
-    }
 
     @Test
     fun `should accept domain dependency`() {
@@ -144,15 +133,34 @@ class NodeMetadataTest {
         assertThat((dependency as DomainDependency).domain).isEqualTo("http://domain")
     }
 
-//TODO add test for each combination
     @Test
-    fun `should accept all service dependency with idleTimeout and requestTimeout defined`() {
+    fun `should accept wildcard service dependency with idleTimeout and requestTimeout defined`() {
         // given
         val proto = outgoingDependencyProto(service = "*", idleTimeout = "10s", requestTimeout = "10s")
         val dependency = proto.toDependency() as WildCardServiceDependency
 
         // expects
         assertThat(dependency.settings.timeoutPolicy!!.idleTimeout).isEqualTo(Durations.fromSeconds(10L))
+        assertThat(dependency.settings.timeoutPolicy!!.requestTimeout).isEqualTo(Durations.fromSeconds(10L))
+    }
+
+    @Test
+    fun `should accept wildcard service dependency with idleTimeout defined`() {
+        // given
+        val proto = outgoingDependencyProto(service = "*", idleTimeout = "10s")
+        val dependency = proto.toDependency() as WildCardServiceDependency
+
+        // expects
+        assertThat(dependency.settings.timeoutPolicy!!.idleTimeout).isEqualTo(Durations.fromSeconds(10L))
+    }
+
+    @Test
+    fun `should accept wildcard service dependency with requestTimeout defined`() {
+        // given
+        val proto = outgoingDependencyProto(service = "*", requestTimeout = "10s")
+        val dependency = proto.toDependency() as WildCardServiceDependency
+
+        // expects
         assertThat(dependency.settings.timeoutPolicy!!.requestTimeout).isEqualTo(Durations.fromSeconds(10L))
     }
 
@@ -235,6 +243,30 @@ class NodeMetadataTest {
         assertThat(incoming.healthCheck.clusterName).isEqualTo("local_service_health_check")
         assertThat(incoming.healthCheck.path).isEqualTo("/status/ping")
         assertThat(incoming.healthCheck.hasCustomHealthCheck()).isTrue()
+    }
+
+    @Test
+    fun `should get wildcardServiceDependency when it's defined`() {
+        // given
+        val proto = outgoingDependenciesProto(serviceDependencies = setOf("*"))
+
+        // when
+        val outgoing = proto.toOutgoing(SnapshotProperties())
+
+        // expects
+        assertThat(outgoing.wildcardServiceDependency).isNotNull
+    }
+
+    @Test
+    fun `should not return wildcardServiceDependency when it's absent`() {
+        // given
+        val proto = outgoingDependenciesProto(serviceDependencies = setOf("service-name"))
+
+        // when
+        val outgoing = proto.toOutgoing(SnapshotProperties())
+
+        // expects
+        assertThat(outgoing.wildcardServiceDependency).isNull()
     }
 
     @Test

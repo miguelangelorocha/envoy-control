@@ -58,7 +58,9 @@ val addedProxySettings = ProxySettings(Incoming(
 
 fun ProxySettings.with(serviceDependencies: Set<ServiceDependency> = emptySet(), domainDependencies: Set<DomainDependency> = emptySet(), wildCardServiceDependency: WildCardServiceDependency? = null) = copy(
     outgoing = Outgoing(
-        dependencies = listOfNotNull(wildCardServiceDependency) + serviceDependencies.toList() + domainDependencies.toList()
+        serviceDependencies = serviceDependencies.toList(),
+        domainDependencies = domainDependencies.toList(),
+        wildcardServiceDependency = wildCardServiceDependency
     )
 )
 
@@ -106,15 +108,28 @@ fun proxySettingsProto(
         })
     }
     if (serviceDependencies.isNotEmpty()) {
-        putFields("outgoing", struct {
-            putFields("dependencies", list {
-                serviceDependencies.forEach {
-                    addValues(outgoingDependencyProto(service = it, idleTimeout = idleTimeout, requestTimeout = responseTimeout))
-                }
-            })
-        })
+        putFields("outgoing", outgoingDependenciesProto(serviceDependencies, idleTimeout, responseTimeout))
     }
 }
+
+fun outgoingDependenciesProto(
+    serviceDependencies: Set<String> = emptySet(),
+    idleTimeout: String? = null,
+    responseTimeout: String? = null
+) =
+    struct {
+        putFields("dependencies", list {
+            serviceDependencies.forEach {
+                addValues(
+                    outgoingDependencyProto(
+                        service = it,
+                        idleTimeout = idleTimeout,
+                        requestTimeout = responseTimeout
+                    )
+                )
+            }
+        })
+    }
 
 fun outgoingDependencyProto(
     service: String? = null,

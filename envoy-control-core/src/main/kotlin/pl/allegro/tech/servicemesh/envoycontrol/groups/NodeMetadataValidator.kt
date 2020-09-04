@@ -81,7 +81,7 @@ class NodeMetadataValidator(
     }
 
     private fun hasAllServicesDependencies(metadata: NodeMetadata) =
-        metadata.proxySettings.outgoing.getWildcardServiceDependency() != null
+        metadata.proxySettings.outgoing.wildcardServiceDependency != null
 
     private fun isAllowedToHaveAllServiceDependencies(metadata: NodeMetadata) = properties
         .outgoingPermissions.servicesAllowedToUseWildcard.contains(metadata.serviceName)
