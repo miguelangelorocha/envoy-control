@@ -80,7 +80,7 @@ fun Value?.toOutgoing(properties: SnapshotProperties): Outgoing {
 
     if (serviceDependencies.size > 1) {
         throw NodeMetadataValidationException(
-            "Define at most one 'all services' as an outgoing dependency"
+            "Define at most one 'wildcard service' as an outgoing dependency"
         )
     }
     return Outgoing(

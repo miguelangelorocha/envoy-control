@@ -108,12 +108,12 @@ fun proxySettingsProto(
         })
     }
     if (serviceDependencies.isNotEmpty()) {
-        putFields("outgoing", outgoingDependenciesProto(serviceDependencies, idleTimeout, responseTimeout))
+        putFields("outgoing", outgoingDependenciesProto(serviceDependencies.toList(), idleTimeout, responseTimeout))
     }
 }
 
 fun outgoingDependenciesProto(
-    serviceDependencies: Set<String> = emptySet(),
+    serviceDependencies: List<String> = emptyList(),
     idleTimeout: String? = null,
     responseTimeout: String? = null
 ) =

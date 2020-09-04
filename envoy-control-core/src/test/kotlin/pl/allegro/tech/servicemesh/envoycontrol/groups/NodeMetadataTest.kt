@@ -248,7 +248,7 @@ class NodeMetadataTest {
     @Test
     fun `should get wildcardServiceDependency when it's defined`() {
         // given
-        val proto = outgoingDependenciesProto(serviceDependencies = setOf("*"))
+        val proto = outgoingDependenciesProto(serviceDependencies = listOf("*"))
 
         // when
         val outgoing = proto.toOutgoing(SnapshotProperties())
@@ -260,13 +260,27 @@ class NodeMetadataTest {
     @Test
     fun `should not return wildcardServiceDependency when it's absent`() {
         // given
-        val proto = outgoingDependenciesProto(serviceDependencies = setOf("service-name"))
+        val proto = outgoingDependenciesProto(serviceDependencies = listOf("service-name"))
 
         // when
         val outgoing = proto.toOutgoing(SnapshotProperties())
 
         // expects
         assertThat(outgoing.wildcardServiceDependency).isNull()
+    }
+
+    @Test
+    fun `should throw exception when there are multiple wildcard dependencies`() {
+        // given
+        val proto = outgoingDependenciesProto(serviceDependencies = listOf("*","*","a"))
+
+        // expects
+        val exception = assertThrows<NodeMetadataValidationException> {
+            proto.toOutgoing(SnapshotProperties())
+        }
+        assertThat(exception.status.description)
+            .isEqualTo("Define at most one 'wildcard service' as an outgoing dependency")
+        assertThat(exception.status.code).isEqualTo(Status.Code.INVALID_ARGUMENT)
     }
 
     @Test
