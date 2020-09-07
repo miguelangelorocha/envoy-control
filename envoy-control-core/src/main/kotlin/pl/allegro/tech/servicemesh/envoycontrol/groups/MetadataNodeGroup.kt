@@ -147,7 +147,7 @@ class MetadataNodeGroup(
 
     private fun hasAllServicesDependencies(metadata: NodeMetadata): Boolean {
         return !properties.outgoingPermissions.enabled ||
-            metadata.proxySettings.outgoing.wildcardServiceDependency != null
+            metadata.proxySettings.outgoing.allServicesDependencies
     }
 
     private fun serviceName(metadata: NodeMetadata): String {

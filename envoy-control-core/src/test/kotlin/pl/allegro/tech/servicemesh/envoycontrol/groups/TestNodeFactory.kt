@@ -4,6 +4,7 @@ import com.google.protobuf.ListValue
 import com.google.protobuf.NullValue
 import com.google.protobuf.Struct
 import com.google.protobuf.Value
+import com.google.protobuf.util.Durations
 import io.envoyproxy.envoy.api.v2.core.Node
 
 fun node(
@@ -48,21 +49,38 @@ fun node(
         .build()
 }
 
-val addedProxySettings = ProxySettings(Incoming(
-    endpoints = listOf(IncomingEndpoint(
-        path = "/endpoint",
-        clients = setOf(ClientWithSelector("client1"))
-    )),
-    permissionsEnabled = true
-))
-
-fun ProxySettings.with(serviceDependencies: Set<ServiceDependency> = emptySet(), domainDependencies: Set<DomainDependency> = emptySet(), wildCardServiceDependency: WildCardServiceDependency? = null) = copy(
-    outgoing = Outgoing(
-        serviceDependencies = serviceDependencies.toList(),
-        domainDependencies = domainDependencies.toList(),
-        wildcardServiceDependency = wildCardServiceDependency
+val addedProxySettings = ProxySettings(
+    Incoming(
+        endpoints = listOf(
+            IncomingEndpoint(
+                path = "/endpoint",
+                clients = setOf(ClientWithSelector("client1"))
+            )
+        ),
+        permissionsEnabled = true
     )
 )
+
+fun ProxySettings.with(
+    serviceDependencies: Set<ServiceDependency> = emptySet(),
+    domainDependencies: Set<DomainDependency> = emptySet(),
+    allServicesDependencies: Boolean = false,
+    defaultServiceSettings: DependencySettings? = null
+): ProxySettings {
+    return copy(
+        outgoing = Outgoing(
+            serviceDependencies = serviceDependencies.toList(),
+            domainDependencies = domainDependencies.toList(),
+            allServicesDependencies = allServicesDependencies,
+            defaultServiceSettings = defaultServiceSettings ?: DependencySettings(
+                timeoutPolicy = Outgoing.TimeoutPolicy(
+                    Durations.fromSeconds(120),
+                    Durations.fromSeconds(120)
+                )
+            )
+        )
+    )
+}
 
 fun accessLogFilterProto(statusCodeFilter: String? = null): Value = struct {
     when {

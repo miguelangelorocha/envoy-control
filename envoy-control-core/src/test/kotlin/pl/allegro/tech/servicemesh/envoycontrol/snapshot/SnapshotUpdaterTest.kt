@@ -25,7 +25,6 @@ import pl.allegro.tech.servicemesh.envoycontrol.groups.Outgoing
 import pl.allegro.tech.servicemesh.envoycontrol.groups.ProxySettings
 import pl.allegro.tech.servicemesh.envoycontrol.groups.ServiceDependency
 import pl.allegro.tech.servicemesh.envoycontrol.groups.ServicesGroup
-import pl.allegro.tech.servicemesh.envoycontrol.groups.WildCardServiceDependency
 import pl.allegro.tech.servicemesh.envoycontrol.groups.with
 import pl.allegro.tech.servicemesh.envoycontrol.services.Locality
 import pl.allegro.tech.servicemesh.envoycontrol.services.ClusterState
@@ -52,6 +51,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.function.Consumer
 
+@Suppress("LargeClass")
 class SnapshotUpdaterTest {
 
     companion object {
@@ -87,6 +87,28 @@ class SnapshotUpdaterTest {
         ),
         Locality.LOCAL, "cluster"
     ).toMultiClusterState()
+
+    @Test
+    fun `should generate allServicesGroup snapshots`() {
+        val cache = MockCache()
+
+        val allServicesGroup = AllServicesGroup(communicationMode = XDS)
+
+        cache.setSnapshot(allServicesGroup, uninitializedSnapshot)
+
+        val updater = snapshotUpdater(
+            cache = cache,
+            properties = SnapshotProperties().apply {
+                incomingPermissions.enabled = true
+            },
+            groups = listOf(allServicesGroup)
+        )
+
+        updater.startWithServices("existingService1", "existingService2")
+
+        hasSnapshot(cache, AllServicesGroup(communicationMode = XDS))
+            .hasOnlyClustersFor("existingService1", "existingService2")
+    }
 
     @Test
     fun `should generate group snapshots`() {
@@ -559,14 +581,6 @@ fun serviceDependencies(vararg serviceNames: String): Set<ServiceDependency> =
             ))
         )
     }.toSet()
-
-fun wildcardServiceDependency(): WildCardServiceDependency =
-        WildCardServiceDependency(
-            settings = DependencySettings(timeoutPolicy = Outgoing.TimeoutPolicy(
-                idleTimeout = Durations.fromSeconds(120L),
-                requestTimeout = Durations.fromSeconds(120L)
-            ))
-        )
 
 fun domainDependencies(vararg serviceNames: String): Set<DomainDependency> =
     serviceNames.map {

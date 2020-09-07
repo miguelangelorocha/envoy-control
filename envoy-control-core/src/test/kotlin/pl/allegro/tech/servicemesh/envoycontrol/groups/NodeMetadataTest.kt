@@ -27,14 +27,22 @@ class NodeMetadataTest {
 
         @JvmStatic
         fun invalidStatusCodeFilterData() = listOf(
-                Arguments.of("LT:123"),
-                Arguments.of("equal:400"),
-                Arguments.of("eq:24"),
-                Arguments.of("GT:200"),
-                Arguments.of("testeq:400test"),
-                Arguments.of("")
+            Arguments.of("LT:123"),
+            Arguments.of("equal:400"),
+            Arguments.of("eq:24"),
+            Arguments.of("GT:200"),
+            Arguments.of("testeq:400test"),
+            Arguments.of("")
         )
     }
+
+    private val defaultDependencySettings = DependencySettings(
+        handleInternalRedirect = false,
+        timeoutPolicy = Outgoing.TimeoutPolicy(
+            idleTimeout = Durations.fromMillis(1000),
+            requestTimeout = Durations.fromMillis(3000)
+        )
+    )
 
     @Test
     fun `should reject endpoint with both path and pathPrefix defined`() {
@@ -92,7 +100,7 @@ class NodeMetadataTest {
         val proto = outgoingDependencyProto()
 
         // expects
-        val exception = assertThrows<NodeMetadataValidationException> { proto.toDependency() }
+        val exception = assertThrows<NodeMetadataValidationException> { proto.toDependency(defaultDependencySettings) }
         assertThat(exception.status.description)
             .isEqualTo("Define either 'service' or 'domain' as an outgoing dependency")
         assertThat(exception.status.code).isEqualTo(Status.Code.INVALID_ARGUMENT)
@@ -104,7 +112,7 @@ class NodeMetadataTest {
         val proto = outgoingDependencyProto(service = "service", domain = "http://domain")
 
         // expects
-        val exception = assertThrows<NodeMetadataValidationException> { proto.toDependency() }
+        val exception = assertThrows<NodeMetadataValidationException> { proto.toDependency(defaultDependencySettings) }
         assertThat(exception.status.description)
             .isEqualTo("Define either 'service' or 'domain' as an outgoing dependency")
         assertThat(exception.status.code).isEqualTo(Status.Code.INVALID_ARGUMENT)
@@ -116,7 +124,7 @@ class NodeMetadataTest {
         val proto = outgoingDependencyProto(domain = "ftp://domain")
 
         // expects
-        val exception = assertThrows<NodeMetadataValidationException> { proto.toDependency() }
+        val exception = assertThrows<NodeMetadataValidationException> { proto.toDependency(defaultDependencySettings) }
         assertThat(exception.status.description)
             .isEqualTo("Unsupported protocol for domain dependency for domain ftp://domain")
         assertThat(exception.status.code).isEqualTo(Status.Code.INVALID_ARGUMENT)
@@ -128,40 +136,9 @@ class NodeMetadataTest {
         val proto = outgoingDependencyProto(domain = "http://domain")
 
         // expects
-        val dependency = proto.toDependency()
+        val dependency = proto.toDependency(defaultDependencySettings)
         assertThat(dependency).isInstanceOf(DomainDependency::class.java)
         assertThat((dependency as DomainDependency).domain).isEqualTo("http://domain")
-    }
-
-    @Test
-    fun `should accept wildcard service dependency with idleTimeout and requestTimeout defined`() {
-        // given
-        val proto = outgoingDependencyProto(service = "*", idleTimeout = "10s", requestTimeout = "10s")
-        val dependency = proto.toDependency() as WildCardServiceDependency
-
-        // expects
-        assertThat(dependency.settings.timeoutPolicy!!.idleTimeout).isEqualTo(Durations.fromSeconds(10L))
-        assertThat(dependency.settings.timeoutPolicy!!.requestTimeout).isEqualTo(Durations.fromSeconds(10L))
-    }
-
-    @Test
-    fun `should accept wildcard service dependency with idleTimeout defined`() {
-        // given
-        val proto = outgoingDependencyProto(service = "*", idleTimeout = "10s")
-        val dependency = proto.toDependency() as WildCardServiceDependency
-
-        // expects
-        assertThat(dependency.settings.timeoutPolicy!!.idleTimeout).isEqualTo(Durations.fromSeconds(10L))
-    }
-
-    @Test
-    fun `should accept wildcard service dependency with requestTimeout defined`() {
-        // given
-        val proto = outgoingDependencyProto(service = "*", requestTimeout = "10s")
-        val dependency = proto.toDependency() as WildCardServiceDependency
-
-        // expects
-        assertThat(dependency.settings.timeoutPolicy!!.requestTimeout).isEqualTo(Durations.fromSeconds(10L))
     }
 
     @Test
@@ -170,7 +147,7 @@ class NodeMetadataTest {
         val proto = outgoingDependencyProto(service = "my-service")
 
         // expects
-        val dependency = proto.toDependency()
+        val dependency = proto.toDependency(defaultDependencySettings)
         assertThat(dependency).isInstanceOf(ServiceDependency::class.java)
         assertThat((dependency as ServiceDependency).service).isEqualTo("my-service")
     }
@@ -179,7 +156,7 @@ class NodeMetadataTest {
     fun `should return correct host and default port for domain dependency`() {
         // given
         val proto = outgoingDependencyProto(domain = "http://domain")
-        val dependency = proto.toDependency() as DomainDependency
+        val dependency = proto.toDependency(defaultDependencySettings) as DomainDependency
 
         // expects
         assertThat(dependency.getHost()).isEqualTo("domain")
@@ -190,7 +167,7 @@ class NodeMetadataTest {
     fun `should return custom port for domain dependency if it was defined`() {
         // given
         val proto = outgoingDependencyProto(domain = "http://domain:1234")
-        val dependency = proto.toDependency() as DomainDependency
+        val dependency = proto.toDependency(defaultDependencySettings) as DomainDependency
 
         // expects
         assertThat(dependency.getPort()).isEqualTo(1234)
@@ -200,7 +177,7 @@ class NodeMetadataTest {
     fun `should return correct names for domain dependency without port specified`() {
         // given
         val proto = outgoingDependencyProto(domain = "http://domain.pl")
-        val dependency = proto.toDependency() as DomainDependency
+        val dependency = proto.toDependency(defaultDependencySettings) as DomainDependency
 
         // expects
         assertThat(dependency.getClusterName()).isEqualTo("domain_pl_80")
@@ -211,7 +188,7 @@ class NodeMetadataTest {
     fun `should return correct names for domain dependency with port specified`() {
         // given
         val proto = outgoingDependencyProto(domain = "http://domain.pl:80")
-        val dependency = proto.toDependency() as DomainDependency
+        val dependency = proto.toDependency(defaultDependencySettings) as DomainDependency
 
         // expects
         assertThat(dependency.getClusterName()).isEqualTo("domain_pl_80")
@@ -222,7 +199,7 @@ class NodeMetadataTest {
     fun `should accept service dependency with redirect policy defined`() {
         // given
         val proto = outgoingDependencyProto(service = "service-1", handleInternalRedirect = true)
-        val dependency = proto.toDependency() as ServiceDependency
+        val dependency = proto.toDependency(defaultDependencySettings) as ServiceDependency
 
         // expects
         assertThat(dependency.service).isEqualTo("service-1")
@@ -245,16 +222,20 @@ class NodeMetadataTest {
         assertThat(incoming.healthCheck.hasCustomHealthCheck()).isTrue()
     }
 
+//    TODO add tests for default/wildcard/service timeouts combinations
+
     @Test
     fun `should get wildcardServiceDependency when it's defined`() {
         // given
-        val proto = outgoingDependenciesProto(serviceDependencies = listOf("*"))
+        val proto = outgoingDependenciesProto(serviceDependencies = listOf("*"), idleTimeout = "10s", responseTimeout = "10s")
 
         // when
         val outgoing = proto.toOutgoing(SnapshotProperties())
 
         // expects
-        assertThat(outgoing.wildcardServiceDependency).isNotNull
+        assertThat(outgoing.allServicesDependencies).isTrue()
+        assertThat(outgoing.defaultServiceSettings.timeoutPolicy!!.idleTimeout).isEqualTo(Durations.fromSeconds(10L))
+        assertThat(outgoing.defaultServiceSettings.timeoutPolicy!!.requestTimeout).isEqualTo(Durations.fromSeconds(10L))
     }
 
     @Test
@@ -266,7 +247,7 @@ class NodeMetadataTest {
         val outgoing = proto.toOutgoing(SnapshotProperties())
 
         // expects
-        assertThat(outgoing.wildcardServiceDependency).isNull()
+        assertThat(outgoing.allServicesDependencies).isFalse()
     }
 
     @Test
@@ -319,7 +300,7 @@ class NodeMetadataTest {
     fun `should accept service dependency with idleTimeout defined`() {
         // given
         val proto = outgoingDependencyProto(service = "service-1", idleTimeout = "10s")
-        val dependency = proto.toDependency() as ServiceDependency
+        val dependency = proto.toDependency(defaultDependencySettings) as ServiceDependency
 
         // expects
         assertThat(dependency.service).isEqualTo("service-1")
@@ -330,7 +311,7 @@ class NodeMetadataTest {
     fun `should accept service dependency with requestTimeout defined`() {
         // given
         val proto = outgoingDependencyProto(service = "service-1", requestTimeout = "10s")
-        val dependency = proto.toDependency() as ServiceDependency
+        val dependency = proto.toDependency(defaultDependencySettings) as ServiceDependency
 
         // expects
         assertThat(dependency.service).isEqualTo("service-1")
@@ -341,7 +322,7 @@ class NodeMetadataTest {
     fun `should accept service dependency with idleTimeout and requestTimeout defined`() {
         // given
         val proto = outgoingDependencyProto(service = "service-1", idleTimeout = "10s", requestTimeout = "10s")
-        val dependency = proto.toDependency() as ServiceDependency
+        val dependency = proto.toDependency(defaultDependencySettings) as ServiceDependency
 
         // expects
         assertThat(dependency.service).isEqualTo("service-1")
@@ -358,8 +339,10 @@ class NodeMetadataTest {
         val exception = assertThrows<NodeMetadataValidationException> { proto.toDuration() }
 
         // then
-        assertThat(exception.status.description).isEqualTo("Timeout definition has number format" +
-            " but should be in string format and ends with 's'")
+        assertThat(exception.status.description).isEqualTo(
+            "Timeout definition has number format" +
+                " but should be in string format and ends with 's'"
+        )
         assertThat(exception.status.code).isEqualTo(Status.Code.INVALID_ARGUMENT)
     }
 
@@ -372,8 +355,10 @@ class NodeMetadataTest {
         val exception = assertThrows<NodeMetadataValidationException> { proto.toDuration() }
 
         // then
-        assertThat(exception.status.description).isEqualTo("Timeout definition has incorrect format: " +
-            "Invalid duration string: 20")
+        assertThat(exception.status.description).isEqualTo(
+            "Timeout definition has incorrect format: " +
+                "Invalid duration string: 20"
+        )
         assertThat(exception.status.code).isEqualTo(Status.Code.INVALID_ARGUMENT)
     }
 
@@ -410,7 +395,7 @@ class NodeMetadataTest {
 
         // when
         val statusCodeFilterSettings = proto.structValue?.fieldsMap?.get("status_code_filter").toStatusCodeFilter(
-                AccessLogFilterFactory()
+            AccessLogFilterFactory()
         )
 
         // expects
@@ -447,7 +432,7 @@ class NodeMetadataTest {
             )
         }
         assertThat(exception.status.description)
-                .isEqualTo("Invalid access log status code filter. Expected OPERATOR:STATUS_CODE")
+            .isEqualTo("Invalid access log status code filter. Expected OPERATOR:STATUS_CODE")
         assertThat(exception.status.code).isEqualTo(Status.Code.INVALID_ARGUMENT)
     }
 }
