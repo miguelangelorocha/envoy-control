@@ -131,7 +131,10 @@ private fun Value.toSettings(defaultSettings: DependencySettings): DependencySet
     val timeoutPolicy = this.field("timeoutPolicy").toOutgoingTimeoutPolicy(defaultSettings.timeoutPolicy!!)
     val rewriteHostHeader = this.field("rewriteHostHeader")?.boolValue
 
-    if (handleInternalRedirect == null && rewriteHostHeader == null && timeoutPolicy == defaultSettings.timeoutPolicy!!) {
+    if (handleInternalRedirect == null &&
+        rewriteHostHeader == null &&
+        timeoutPolicy == defaultSettings.timeoutPolicy
+    ) {
         return defaultSettings
     }
     return DependencySettings(
