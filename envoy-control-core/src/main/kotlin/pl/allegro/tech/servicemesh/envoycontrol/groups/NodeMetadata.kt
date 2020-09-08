@@ -91,9 +91,9 @@ fun Value?.toOutgoing(properties: SnapshotProperties): Outgoing {
         )
     )
 
-    val defaultSettings =
+    val allServicesDefaultSettings =
         allServiceDependencies.firstOrNull()?.toSettings(defaultSettingsFromProperties) ?: defaultSettingsFromProperties
-    val dependencies = list.subtract(allServiceDependencies).map { it.toDependency(defaultSettings) }
+    val dependencies = list.subtract(allServiceDependencies).map { it.toDependency(allServicesDefaultSettings) }
     // TODO use defaultSettingsFromProperties for domains
     val domainDependencies = dependencies.filterIsInstance<ServiceDependency>()
     val wildcardDependency = dependencies.filterIsInstance<DomainDependency>()
@@ -101,7 +101,7 @@ fun Value?.toOutgoing(properties: SnapshotProperties): Outgoing {
     return Outgoing(
         serviceDependencies = domainDependencies,
         domainDependencies = wildcardDependency,
-        defaultServiceSettings = defaultSettings,
+        defaultServiceSettings = allServicesDefaultSettings,
         allServicesDependencies = allServiceDependencies.isNotEmpty()
     )
 }
@@ -127,8 +127,7 @@ fun Value.toDependency(defaultSettings: DependencySettings): Dependency {
 
 private fun Value.toSettings(defaultSettings: DependencySettings): DependencySettings {
     val handleInternalRedirect = this.field("handleInternalRedirect")?.boolValue
-// TODO !!
-    val timeoutPolicy = this.field("timeoutPolicy").toOutgoingTimeoutPolicy(defaultSettings.timeoutPolicy!!)
+    val timeoutPolicy = this.field("timeoutPolicy").toOutgoingTimeoutPolicy(defaultSettings.timeoutPolicy)
     val rewriteHostHeader = this.field("rewriteHostHeader")?.boolValue
 
     if (handleInternalRedirect == null &&
@@ -271,11 +270,15 @@ data class Outgoing(
     val allServicesDependencies: Boolean = false,
     val defaultServiceSettings: DependencySettings = DependencySettings()
 ) {
-
     data class TimeoutPolicy(
-        val idleTimeout: Duration,
-        val requestTimeout: Duration
-    )
+        val idleTimeout: Duration = DEFAULT_IDLE_TIMEOUT,
+        val requestTimeout: Duration = DEFAULT_REQUEST_TIMEOUT
+    ) {
+        companion object {
+            val DEFAULT_IDLE_TIMEOUT: Duration = Durations.fromSeconds(120)
+            val DEFAULT_REQUEST_TIMEOUT: Duration = Durations.fromSeconds(120)
+        }
+    }
 }
 
 interface Dependency
@@ -307,7 +310,7 @@ data class DomainDependency(
 
 data class DependencySettings(
     val handleInternalRedirect: Boolean = false,
-    val timeoutPolicy: Outgoing.TimeoutPolicy? = null,
+    val timeoutPolicy: Outgoing.TimeoutPolicy = Outgoing.TimeoutPolicy(),
     val rewriteHostHeader: Boolean = false
 )
 

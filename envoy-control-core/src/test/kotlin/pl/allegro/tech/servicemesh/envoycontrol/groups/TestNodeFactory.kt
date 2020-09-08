@@ -1,10 +1,10 @@
+@file:Suppress("MatchingDeclarationName")
 package pl.allegro.tech.servicemesh.envoycontrol.groups
 
 import com.google.protobuf.ListValue
 import com.google.protobuf.NullValue
 import com.google.protobuf.Struct
 import com.google.protobuf.Value
-import com.google.protobuf.util.Durations
 import io.envoyproxy.envoy.api.v2.core.Node
 
 fun node(
@@ -65,19 +65,14 @@ fun ProxySettings.with(
     serviceDependencies: Set<ServiceDependency> = emptySet(),
     domainDependencies: Set<DomainDependency> = emptySet(),
     allServicesDependencies: Boolean = false,
-    defaultServiceSettings: DependencySettings? = null
+    defaultServiceSettings: DependencySettings = DependencySettings()
 ): ProxySettings {
     return copy(
         outgoing = Outgoing(
             serviceDependencies = serviceDependencies.toList(),
             domainDependencies = domainDependencies.toList(),
             allServicesDependencies = allServicesDependencies,
-            defaultServiceSettings = defaultServiceSettings ?: DependencySettings(
-                timeoutPolicy = Outgoing.TimeoutPolicy(
-                    Durations.fromSeconds(120),
-                    Durations.fromSeconds(120)
-                )
-            )
+            defaultServiceSettings = defaultServiceSettings
         )
     )
 }
@@ -126,28 +121,65 @@ fun proxySettingsProto(
         })
     }
     if (serviceDependencies.isNotEmpty()) {
-        putFields("outgoing", outgoingDependenciesProto(serviceDependencies.toList(), idleTimeout, responseTimeout))
+        putFields("outgoing", outgoingDependenciesProto {
+            withServices(serviceDependencies.toList(), idleTimeout, responseTimeout)
+        })
     }
 }
 
+class OutgoingDependenciesProtoScope {
+    class ServiceDependency(val name: String, val idleTimeout: String?, val responseTimeout: String?)
+    class DomainDependency(val name: String, val idleTimeout: String?, val responseTimeout: String?)
+
+    val services = mutableListOf<ServiceDependency>()
+    val domains = mutableListOf<DomainDependency>()
+
+    fun withServices(
+        serviceDependencies: List<String> = emptyList(),
+        idleTimeout: String? = null,
+        responseTimeout: String? = null
+    ) = serviceDependencies.forEach { withService(it, idleTimeout, responseTimeout) }
+
+    fun withService(
+        serviceName: String,
+        idleTimeout: String? = null,
+        responseTimeout: String? = null
+    ) = services.add(ServiceDependency(serviceName, idleTimeout, responseTimeout))
+
+    fun withDomain(
+        url: String,
+        idleTimeout: String? = null,
+        responseTimeout: String? = null
+    ) = domains.add(DomainDependency(url, idleTimeout, responseTimeout))
+}
+
 fun outgoingDependenciesProto(
-    serviceDependencies: List<String> = emptyList(),
-    idleTimeout: String? = null,
-    responseTimeout: String? = null
-) =
-    struct {
+    closure: OutgoingDependenciesProtoScope.() -> Unit
+): Value {
+    val scope = OutgoingDependenciesProtoScope().apply(closure)
+    return struct {
         putFields("dependencies", list {
-            serviceDependencies.forEach {
+            scope.services.forEach {
                 addValues(
                     outgoingDependencyProto(
-                        service = it,
-                        idleTimeout = idleTimeout,
-                        requestTimeout = responseTimeout
+                        service = it.name,
+                        idleTimeout = it.idleTimeout,
+                        requestTimeout = it.responseTimeout
+                    )
+                )
+            }
+            scope.domains.forEach {
+                addValues(
+                    outgoingDependencyProto(
+                        domain = it.name,
+                        idleTimeout = it.idleTimeout,
+                        requestTimeout = it.responseTimeout
                     )
                 )
             }
         })
     }
+}
 
 fun outgoingDependencyProto(
     service: String? = null,
