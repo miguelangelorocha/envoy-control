@@ -128,7 +128,7 @@ fun proxySettingsProto(
 }
 
 class OutgoingDependenciesProtoScope {
-    class Dependency(val service: String? = null, val domain: String? = null, val idleTimeout: String? = null, val responseTimeout: String? = null, val handleInternalRedirect: Boolean? = null)
+    class Dependency(val service: String? = null, val domain: String? = null, val idleTimeout: String? = null, val requestTimeout: String? = null, val handleInternalRedirect: Boolean? = null)
 
     val dependencies = mutableListOf<Dependency>()
 
@@ -141,13 +141,13 @@ class OutgoingDependenciesProtoScope {
     fun withService(
         serviceName: String,
         idleTimeout: String? = null,
-        responseTimeout: String? = null,
+        requestTimeout: String? = null,
         handleInternalRedirect: Boolean? = null
     ) = dependencies.add(
         Dependency(
             service = serviceName,
             idleTimeout = idleTimeout,
-            responseTimeout = responseTimeout,
+            requestTimeout = requestTimeout,
             handleInternalRedirect = handleInternalRedirect
         )
     )
@@ -155,12 +155,12 @@ class OutgoingDependenciesProtoScope {
     fun withDomain(
         url: String,
         idleTimeout: String? = null,
-        responseTimeout: String? = null
+        requestTimeout: String? = null
     ) = dependencies.add(
         Dependency(
             domain = url,
             idleTimeout = idleTimeout,
-            responseTimeout = responseTimeout
+            requestTimeout = requestTimeout
         )
     )
 
@@ -184,7 +184,7 @@ fun outgoingDependenciesProto(
                         service = it.service,
                         domain = it.domain,
                         idleTimeout = it.idleTimeout,
-                        requestTimeout = it.responseTimeout,
+                        requestTimeout = it.requestTimeout,
                         handleInternalRedirect = it.handleInternalRedirect
                     )
                 )

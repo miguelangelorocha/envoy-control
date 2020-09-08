@@ -264,7 +264,7 @@ class NodeMetadataTest {
     fun `should parse allServiceDependency with timeouts configuration`() {
         // given
         val proto = outgoingDependenciesProto {
-            withService(serviceName = "*", idleTimeout = "10s", responseTimeout = "10s")
+            withService(serviceName = "*", idleTimeout = "10s", requestTimeout = "10s")
         }
 
         // when
@@ -277,10 +277,10 @@ class NodeMetadataTest {
     }
 
     @Test
-    fun `should parse allServiceDependency and use responseTimeout from properties`() {
+    fun `should parse allServiceDependency and use requestTimeout from properties`() {
         // given
         val proto = outgoingDependenciesProto {
-            withService(serviceName = "*", idleTimeout = "10s", responseTimeout = null)
+            withService(serviceName = "*", idleTimeout = "10s", requestTimeout = null)
         }
         val properties = snapshotProperties(allServicesDependenciesIdentifier = "*", requestTimeout = "5s")
         // when
@@ -297,7 +297,7 @@ class NodeMetadataTest {
     fun `should parse allServiceDependency and use idleTimeout from properties`() {
         // given
         val proto = outgoingDependenciesProto {
-            withService(serviceName = "*", idleTimeout = null, responseTimeout = "10s")
+            withService(serviceName = "*", idleTimeout = null, requestTimeout = "10s")
         }
         val properties = snapshotProperties(allServicesDependenciesIdentifier = "*", idleTimeout = "5s")
         // when
@@ -314,7 +314,7 @@ class NodeMetadataTest {
     fun `should parse allServiceDependency and use timeouts from properties`() {
         // given
         val proto = outgoingDependenciesProto {
-            withService(serviceName = "*", idleTimeout = null, responseTimeout = null)
+            withService(serviceName = "*", idleTimeout = null, requestTimeout = null)
         }
         val properties =
             snapshotProperties(allServicesDependenciesIdentifier = "*", idleTimeout = "5s", requestTimeout = "5s")
@@ -329,13 +329,13 @@ class NodeMetadataTest {
     }
 
     @Test
-    fun `should parse serviceDependencies and use missing timeouts from allServiceDependency when it's defined`() {
+    fun `should parse service dependencies and for missing config use config defined in allServiceDependency`() {
         // given
         val proto = outgoingDependenciesProto {
-            withService(serviceName = "*", idleTimeout = "10s", responseTimeout = "10s")
-            withService(serviceName = "service-name-1", idleTimeout = "5s", responseTimeout = null)
-            withService(serviceName = "service-name-2", idleTimeout = null, responseTimeout = "4s")
-            withService(serviceName = "service-name-3", idleTimeout = null, responseTimeout = null)
+            withService(serviceName = "*", idleTimeout = "10s", requestTimeout = "10s")
+            withService(serviceName = "service-name-1", idleTimeout = "5s", requestTimeout = null)
+            withService(serviceName = "service-name-2", idleTimeout = null, requestTimeout = "4s")
+            withService(serviceName = "service-name-3", idleTimeout = null, requestTimeout = null)
         }
         val properties = snapshotProperties(allServicesDependenciesIdentifier = "*")
         // when
@@ -355,12 +355,12 @@ class NodeMetadataTest {
     }
 
     @Test
-    fun `should parse serviceDependencies and use missing timeouts from properties when allServiceDependency isn't defined`() {
+    fun `should parse service dependencies and for missing configs use config defined in properties when allServiceDependency isn't defined`() {
         // given
         val proto = outgoingDependenciesProto {
-            withService(serviceName = "service-name-1", idleTimeout = "5s", responseTimeout = null)
-            withService(serviceName = "service-name-2", idleTimeout = null, responseTimeout = "4s")
-            withService(serviceName = "service-name-3", idleTimeout = null, responseTimeout = null)
+            withService(serviceName = "service-name-1", idleTimeout = "5s", requestTimeout = null)
+            withService(serviceName = "service-name-2", idleTimeout = null, requestTimeout = "4s")
+            withService(serviceName = "service-name-3", idleTimeout = null, requestTimeout = null)
         }
         val properties = snapshotProperties(idleTimeout = "12s", requestTimeout = "12s")
         // when
@@ -381,13 +381,13 @@ class NodeMetadataTest {
 
     @Disabled("to fix")
     @Test
-    fun `should parse domainDependencies and use missing timeouts from properties even if allServiceDependency is defined`() {
+    fun `should parse domain dependencies and for missing config use config defined in properties even if allServiceDependency is defined`() {
         // given
         val proto = outgoingDependenciesProto {
-            withService(serviceName = "*", idleTimeout = "10s", responseTimeout = "10s")
-            withDomain(url = "http://domain-name-1", idleTimeout = "5s", responseTimeout = null)
-            withDomain(url = "http://domain-name-2", idleTimeout = null, responseTimeout = "4s")
-            withDomain(url = "http://domain-name-3", idleTimeout = null, responseTimeout = null)
+            withService(serviceName = "*", idleTimeout = "10s", requestTimeout = "10s")
+            withDomain(url = "http://domain-name-1", idleTimeout = "5s", requestTimeout = null)
+            withDomain(url = "http://domain-name-2", idleTimeout = null, requestTimeout = "4s")
+            withDomain(url = "http://domain-name-3", idleTimeout = null, requestTimeout = null)
         }
         val properties = snapshotProperties(idleTimeout = "12s", requestTimeout = "12s")
         // when
