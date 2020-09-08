@@ -128,11 +128,9 @@ fun proxySettingsProto(
 }
 
 class OutgoingDependenciesProtoScope {
-    class ServiceDependency(val name: String, val idleTimeout: String?, val responseTimeout: String?)
-    class DomainDependency(val name: String, val idleTimeout: String?, val responseTimeout: String?)
+    class Dependency(val service: String? = null, val domain: String? = null, val idleTimeout: String? = null, val responseTimeout: String? = null, val handleInternalRedirect: Boolean? = null)
 
-    val services = mutableListOf<ServiceDependency>()
-    val domains = mutableListOf<DomainDependency>()
+    val dependencies = mutableListOf<Dependency>()
 
     fun withServices(
         serviceDependencies: List<String> = emptyList(),
@@ -143,14 +141,35 @@ class OutgoingDependenciesProtoScope {
     fun withService(
         serviceName: String,
         idleTimeout: String? = null,
-        responseTimeout: String? = null
-    ) = services.add(ServiceDependency(serviceName, idleTimeout, responseTimeout))
+        responseTimeout: String? = null,
+        handleInternalRedirect: Boolean? = null
+    ) = dependencies.add(
+        Dependency(
+            service = serviceName,
+            idleTimeout = idleTimeout,
+            responseTimeout = responseTimeout,
+            handleInternalRedirect = handleInternalRedirect
+        )
+    )
 
     fun withDomain(
         url: String,
         idleTimeout: String? = null,
         responseTimeout: String? = null
-    ) = domains.add(DomainDependency(url, idleTimeout, responseTimeout))
+    ) = dependencies.add(
+        Dependency(
+            domain = url,
+            idleTimeout = idleTimeout,
+            responseTimeout = responseTimeout
+        )
+    )
+
+    fun withInvalid(service: String? = null, domain: String? = null) = dependencies.add(
+        Dependency(
+            service = service,
+            domain = domain
+        )
+    )
 }
 
 fun outgoingDependenciesProto(
@@ -159,21 +178,14 @@ fun outgoingDependenciesProto(
     val scope = OutgoingDependenciesProtoScope().apply(closure)
     return struct {
         putFields("dependencies", list {
-            scope.services.forEach {
+            scope.dependencies.forEach {
                 addValues(
                     outgoingDependencyProto(
-                        service = it.name,
+                        service = it.service,
+                        domain = it.domain,
                         idleTimeout = it.idleTimeout,
-                        requestTimeout = it.responseTimeout
-                    )
-                )
-            }
-            scope.domains.forEach {
-                addValues(
-                    outgoingDependencyProto(
-                        domain = it.name,
-                        idleTimeout = it.idleTimeout,
-                        requestTimeout = it.responseTimeout
+                        requestTimeout = it.responseTimeout,
+                        handleInternalRedirect = it.handleInternalRedirect
                     )
                 )
             }

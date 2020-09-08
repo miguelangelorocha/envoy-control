@@ -111,10 +111,12 @@ class NodeMetadataTest {
     @Test
     fun `should reject dependency with neither service nor domain field defined`() {
         // given
-        val proto = outgoingDependencyProto()
+        val proto = outgoingDependenciesProto {
+            withInvalid(service = null, domain = null)
+        }
 
         // expects
-        val exception = assertThrows<NodeMetadataValidationException> { proto.toDependency(defaultDependencySettings) }
+        val exception = assertThrows<NodeMetadataValidationException> { proto.toOutgoing(snapshotProperties()) }
         assertThat(exception.status.description)
             .isEqualTo("Define either 'service' or 'domain' as an outgoing dependency")
         assertThat(exception.status.code).isEqualTo(Status.Code.INVALID_ARGUMENT)
@@ -123,10 +125,12 @@ class NodeMetadataTest {
     @Test
     fun `should reject dependency with both service and domain fields defined`() {
         // given
-        val proto = outgoingDependencyProto(service = "service", domain = "http://domain")
+        val proto = outgoingDependenciesProto {
+            withInvalid(service = "service", domain = "http://domain")
+        }
 
         // expects
-        val exception = assertThrows<NodeMetadataValidationException> { proto.toDependency(defaultDependencySettings) }
+        val exception = assertThrows<NodeMetadataValidationException> { proto.toOutgoing(snapshotProperties()) }
         assertThat(exception.status.description)
             .isEqualTo("Define either 'service' or 'domain' as an outgoing dependency")
         assertThat(exception.status.code).isEqualTo(Status.Code.INVALID_ARGUMENT)
@@ -135,10 +139,12 @@ class NodeMetadataTest {
     @Test
     fun `should reject dependency with unsupported protocol in domain field `() {
         // given
-        val proto = outgoingDependencyProto(domain = "ftp://domain")
+        val proto = outgoingDependenciesProto {
+            withDomain(url = "ftp://domain")
+        }
 
         // expects
-        val exception = assertThrows<NodeMetadataValidationException> { proto.toDependency(defaultDependencySettings) }
+        val exception = assertThrows<NodeMetadataValidationException> { proto.toOutgoing(snapshotProperties()) }
         assertThat(exception.status.description)
             .isEqualTo("Unsupported protocol for domain dependency for domain ftp://domain")
         assertThat(exception.status.code).isEqualTo(Status.Code.INVALID_ARGUMENT)
@@ -147,32 +153,30 @@ class NodeMetadataTest {
     @Test
     fun `should accept domain dependency`() {
         // given
-        val proto = outgoingDependencyProto(domain = "http://domain")
+        val proto = outgoingDependenciesProto {
+            withDomain(url = "http://domain")
+        }
+
+        // when
+        val outgoing = proto.toOutgoing(snapshotProperties())
 
         // expects
-        val dependency = proto.toDependency(defaultDependencySettings)
-        assertThat(dependency).isInstanceOf(DomainDependency::class.java)
-        assertThat((dependency as DomainDependency).domain).isEqualTo("http://domain")
-    }
-
-    @Test
-    fun `should accept service dependency`() {
-        // given
-        val proto = outgoingDependencyProto(service = "my-service")
-
-        // expects
-        val dependency = proto.toDependency(defaultDependencySettings)
-        assertThat(dependency).isInstanceOf(ServiceDependency::class.java)
-        assertThat((dependency as ServiceDependency).service).isEqualTo("my-service")
+        val dependency = outgoing.domainDependencies.single()
+        assertThat(dependency.domain).isEqualTo("http://domain")
     }
 
     @Test
     fun `should return correct host and default port for domain dependency`() {
         // given
-        val proto = outgoingDependencyProto(domain = "http://domain")
-        val dependency = proto.toDependency(defaultDependencySettings) as DomainDependency
+        val proto = outgoingDependenciesProto {
+            withDomain(url = "http://domain")
+        }
+
+        // when
+        val outgoing = proto.toOutgoing(snapshotProperties())
 
         // expects
+        val dependency = outgoing.domainDependencies.single()
         assertThat(dependency.getHost()).isEqualTo("domain")
         assertThat(dependency.getPort()).isEqualTo(80)
     }
@@ -180,20 +184,30 @@ class NodeMetadataTest {
     @Test
     fun `should return custom port for domain dependency if it was defined`() {
         // given
-        val proto = outgoingDependencyProto(domain = "http://domain:1234")
-        val dependency = proto.toDependency(defaultDependencySettings) as DomainDependency
+        val proto = outgoingDependenciesProto {
+            withDomain(url = "http://domain:1234")
+        }
+
+        // when
+        val outgoing = proto.toOutgoing(snapshotProperties())
 
         // expects
+        val dependency = outgoing.domainDependencies.single()
         assertThat(dependency.getPort()).isEqualTo(1234)
     }
 
     @Test
     fun `should return correct names for domain dependency without port specified`() {
         // given
-        val proto = outgoingDependencyProto(domain = "http://domain.pl")
-        val dependency = proto.toDependency(defaultDependencySettings) as DomainDependency
+        val proto = outgoingDependenciesProto {
+            withDomain(url = "http://domain.pl")
+        }
+
+        // when
+        val outgoing = proto.toOutgoing(snapshotProperties())
 
         // expects
+        val dependency = outgoing.domainDependencies.single()
         assertThat(dependency.getClusterName()).isEqualTo("domain_pl_80")
         assertThat(dependency.getRouteDomain()).isEqualTo("domain.pl")
     }
@@ -201,10 +215,15 @@ class NodeMetadataTest {
     @Test
     fun `should return correct names for domain dependency with port specified`() {
         // given
-        val proto = outgoingDependencyProto(domain = "http://domain.pl:80")
-        val dependency = proto.toDependency(defaultDependencySettings) as DomainDependency
+        val proto = outgoingDependenciesProto {
+            withDomain(url = "http://domain.pl:80")
+        }
+
+        // when
+        val outgoing = proto.toOutgoing(snapshotProperties())
 
         // expects
+        val dependency = outgoing.domainDependencies.single()
         assertThat(dependency.getClusterName()).isEqualTo("domain_pl_80")
         assertThat(dependency.getRouteDomain()).isEqualTo("domain.pl:80")
     }
@@ -212,10 +231,15 @@ class NodeMetadataTest {
     @Test
     fun `should accept service dependency with redirect policy defined`() {
         // given
-        val proto = outgoingDependencyProto(service = "service-1", handleInternalRedirect = true)
-        val dependency = proto.toDependency(defaultDependencySettings) as ServiceDependency
+        val proto = outgoingDependenciesProto {
+            withService(serviceName = "service-1", handleInternalRedirect = true)
+        }
 
-        // expects
+        // when
+        val outgoing = proto.toOutgoing(snapshotProperties())
+
+        // expect
+        val dependency = outgoing.serviceDependencies.single()
         assertThat(dependency.service).isEqualTo("service-1")
         assertThat(dependency.settings.handleInternalRedirect).isEqualTo(true)
     }
@@ -428,40 +452,6 @@ class NodeMetadataTest {
         assertThat(incoming.healthCheck.clusterName).isEqualTo("local_service_health_check")
         assertThat(incoming.healthCheck.path).isEqualTo("/status/ping")
         assertThat(incoming.healthCheck.hasCustomHealthCheck()).isTrue()
-    }
-
-    @Test
-    fun `should accept service dependency with idleTimeout defined`() {
-        // given
-        val proto = outgoingDependencyProto(service = "service-1", idleTimeout = "10s")
-        val dependency = proto.toDependency(defaultDependencySettings) as ServiceDependency
-
-        // expects
-        assertThat(dependency.service).isEqualTo("service-1")
-        assertThat(dependency.settings.timeoutPolicy.idleTimeout).isEqualTo(Durations.fromSeconds(10L))
-    }
-
-    @Test
-    fun `should accept service dependency with requestTimeout defined`() {
-        // given
-        val proto = outgoingDependencyProto(service = "service-1", requestTimeout = "10s")
-        val dependency = proto.toDependency(defaultDependencySettings) as ServiceDependency
-
-        // expects
-        assertThat(dependency.service).isEqualTo("service-1")
-        assertThat(dependency.settings.timeoutPolicy.requestTimeout).isEqualTo(Durations.fromSeconds(10L))
-    }
-
-    @Test
-    fun `should accept service dependency with idleTimeout and requestTimeout defined`() {
-        // given
-        val proto = outgoingDependencyProto(service = "service-1", idleTimeout = "10s", requestTimeout = "10s")
-        val dependency = proto.toDependency(defaultDependencySettings) as ServiceDependency
-
-        // expects
-        assertThat(dependency.service).isEqualTo("service-1")
-        assertThat(dependency.settings.timeoutPolicy.idleTimeout).isEqualTo(Durations.fromSeconds(10L))
-        assertThat(dependency.settings.timeoutPolicy.requestTimeout).isEqualTo(Durations.fromSeconds(10L))
     }
 
     @Test
