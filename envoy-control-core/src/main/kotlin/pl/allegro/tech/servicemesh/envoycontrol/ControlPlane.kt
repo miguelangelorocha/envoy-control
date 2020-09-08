@@ -2,9 +2,11 @@ package pl.allegro.tech.servicemesh.envoycontrol
 
 import io.envoyproxy.controlplane.cache.NodeGroup
 import io.envoyproxy.controlplane.cache.SnapshotCache
+import io.envoyproxy.controlplane.cache.v2.Snapshot
 import io.envoyproxy.controlplane.server.DefaultExecutorGroup
-import io.envoyproxy.controlplane.server.DiscoveryServer
 import io.envoyproxy.controlplane.server.ExecutorGroup
+import io.envoyproxy.controlplane.server.V2DiscoveryServer
+import io.envoyproxy.controlplane.server.V3DiscoveryServer
 import io.envoyproxy.controlplane.server.callback.SnapshotCollectingCallback
 import io.grpc.Server
 import io.grpc.netty.NettyServerBuilder
@@ -34,6 +36,7 @@ import pl.allegro.tech.servicemesh.envoycontrol.snapshot.resource.listeners.filt
 import pl.allegro.tech.servicemesh.envoycontrol.snapshot.resource.routes.ServiceTagMetadataGenerator
 import pl.allegro.tech.servicemesh.envoycontrol.utils.DirectScheduler
 import pl.allegro.tech.servicemesh.envoycontrol.utils.ParallelScheduler
+import pl.allegro.tech.servicemesh.envoycontrol.v2.SimpleCache
 import reactor.core.Disposable
 import reactor.core.publisher.Flux
 import reactor.core.scheduler.Schedulers
@@ -50,7 +53,7 @@ class ControlPlane private constructor(
     val grpcServer: Server,
     val snapshotUpdater: SnapshotUpdater,
     val nodeGroup: NodeGroup<Group>,
-    val cache: SnapshotCache<Group>,
+    val cache: SnapshotCache<Group, Snapshot>,
     private val changes: Flux<MultiClusterState>
 ) : AutoCloseable {
 
@@ -160,7 +163,7 @@ class ControlPlane private constructor(
 
             val groupChangeWatcher = GroupChangeWatcher(cache, metrics, meterRegistry)
 
-            val discoveryServer = DiscoveryServer(
+            val v2discoveryServer = V2DiscoveryServer(
                 listOf(
                     CompositeDiscoveryServerCallbacks(
                         meterRegistry,
@@ -190,6 +193,39 @@ class ControlPlane private constructor(
                 CachedProtoResourcesSerializer(meterRegistry, properties.server.reportProtobufCacheMetrics)
             )
 
+            val v3discoveryServer = V3DiscoveryServer(
+                    listOf(
+                            CompositeDiscoveryServerCallbacks(
+                                    meterRegistry,
+                                    SnapshotCollectingCallback(
+                                            cache,
+                                            nodeGroup,
+                                            Clock.systemDefaultZone(),
+                                            emptySet(),
+                                            cleanupProperties.collectAfterMillis.toMillis(),
+                                            cleanupProperties.collectionIntervalMillis.toMillis()
+                                    ),
+                                    LoggingDiscoveryServerCallbacks(
+                                            properties.server.logFullRequest,
+                                            properties.server.logFullResponse
+                                    ),
+                                    MeteredConnectionsCallbacks().also {
+                                        meterRegistry.gauge("grpc.all-connections", it.connections)
+                                        MeteredConnectionsCallbacks.MetricsStreamType.values().map { type ->
+                                            meterRegistry.gauge(
+                                                    "grpc.connections.${type.name.toLowerCase()}",
+                                                    it.connections(type)
+                                            )
+                                        }
+                                    },
+                                    NodeMetadataValidator(properties.envoy.snapshot)
+                            )
+                    ),
+                    groupChangeWatcher,
+                    executorGroup,
+                    CachedProtoResourcesSerializer(meterRegistry, properties.server.reportProtobufCacheMetrics)
+            )
+
             val snapshotProperties = properties.envoy.snapshot
             val envoySnapshotFactory = EnvoySnapshotFactory(
                 ingressRoutesFactory = EnvoyIngressRoutesFactory(snapshotProperties),
@@ -209,16 +245,21 @@ class ControlPlane private constructor(
             )
 
             return ControlPlane(
-                grpcServer(properties.server, discoveryServer, nioEventLoopExecutor!!, grpcServerExecutor!!),
+                grpcServer(
+                        properties.server,
+                        v2discoveryServer,
+                        v3discoveryServer,
+                        nioEventLoopExecutor!!,
+                        grpcServerExecutor!!
+                ),
                 SnapshotUpdater(
-                    cache,
-                    properties.envoy.snapshot,
-                    envoySnapshotFactory,
-                    Schedulers.fromExecutor(globalSnapshotExecutor!!),
-                    groupSnapshotScheduler,
-                    groupChangeWatcher.onGroupAdded(),
-                    meterRegistry,
-                    envoyHttpFilters
+                        cache,
+                        properties.envoy.snapshot,
+                        envoySnapshotFactory,
+                        Schedulers.fromExecutor(globalSnapshotExecutor!!),
+                        groupSnapshotScheduler,
+                        groupChangeWatcher.onGroupAdded(),
+                        meterRegistry
                 ),
                 nodeGroup,
                 cache,
@@ -266,12 +307,21 @@ class ControlPlane private constructor(
             return this
         }
 
-        private fun NettyServerBuilder.withEnvoyServices(discoveryServer: DiscoveryServer): NettyServerBuilder =
-            this.addService(discoveryServer.aggregatedDiscoveryServiceImpl)
+        private fun NettyServerBuilder.withV2EnvoyServices(discoveryServer: V2DiscoveryServer): NettyServerBuilder {
+            return this.addService(discoveryServer.aggregatedDiscoveryServiceImpl)
+                    .addService(discoveryServer.clusterDiscoveryServiceImpl)
+                    .addService(discoveryServer.endpointDiscoveryServiceImpl)
+                    .addService(discoveryServer.listenerDiscoveryServiceImpl)
+                    .addService(discoveryServer.routeDiscoveryServiceImpl)
+        }
+
+        private fun NettyServerBuilder.withV3EnvoyServices(discoveryServer: V3DiscoveryServer): NettyServerBuilder {
+            return this.addService(discoveryServer.aggregatedDiscoveryServiceImpl)
                 .addService(discoveryServer.clusterDiscoveryServiceImpl)
                 .addService(discoveryServer.endpointDiscoveryServiceImpl)
                 .addService(discoveryServer.listenerDiscoveryServiceImpl)
                 .addService(discoveryServer.routeDiscoveryServiceImpl)
+        }
 
         private class ThreadNamingThreadFactory(val threadNamePrefix: String) : ThreadFactory {
             private val counter = AtomicInteger()
@@ -280,7 +330,8 @@ class ControlPlane private constructor(
 
         private fun grpcServer(
             config: ServerProperties,
-            discoveryServer: DiscoveryServer,
+            v2discoveryServer: V2DiscoveryServer,
+            v3discoveryServer: V3DiscoveryServer,
             nioEventLoopExecutor: Executor,
             grpcServerExecutor: Executor
         ): Server = NettyServerBuilder.forPort(config.port)
@@ -294,7 +345,8 @@ class ControlPlane private constructor(
             .keepAliveTime(config.netty.keepAliveTime.toMillis(), TimeUnit.MILLISECONDS)
             .permitKeepAliveTime(config.netty.permitKeepAliveTime.toMillis(), TimeUnit.MILLISECONDS)
             .permitKeepAliveWithoutCalls(config.netty.permitKeepAliveWithoutCalls)
-            .withEnvoyServices(discoveryServer)
+            .withV2EnvoyServices(v2discoveryServer)
+            .withV3EnvoyServices(v3discoveryServer)
             .build()
     }
 }
