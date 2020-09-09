@@ -6,7 +6,6 @@ import io.envoyproxy.envoy.config.filter.accesslog.v2.ComparisonFilter
 import io.grpc.Status
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.ObjectAssert
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.params.ParameterizedTest
@@ -379,7 +378,6 @@ class NodeMetadataTest {
             .hasTimeouts(idleTimeout = "12s", requestTimeout = "12s")
     }
 
-    @Disabled("to fix")
     @Test
     fun `should parse domain dependencies and for missing config use config defined in properties even if allServiceDependency is defined`() {
         // given

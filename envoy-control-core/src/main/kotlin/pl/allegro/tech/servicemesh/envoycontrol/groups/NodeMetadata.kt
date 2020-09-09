@@ -72,16 +72,17 @@ fun Value?.toStatusCodeFilter(accessLogFilterFactory: AccessLogFilterFactory):
     accessLogFilterFactory.parseStatusCodeFilter(it.toUpperCase())
 }
 
+private class RawDependency(val name: String, val value: Value)
+
 fun Value?.toOutgoing(properties: SnapshotProperties): Outgoing {
-    val list = this?.field("dependencies")?.list().orEmpty()
-    val allServiceDependencies =
-        list.filter { val serviceName = it.field("service")?.stringValue
-            serviceName == properties.outgoingPermissions.allServicesDependencies.identifier }
-    if (allServiceDependencies.size > 1) {
-        throw NodeMetadataValidationException(
-            "Define at most one 'wildcard service' as an outgoing dependency"
-        )
-    }
+
+    val identifier = properties.outgoingPermissions.allServicesDependencies.identifier
+    val (serviceDependencies: List<RawDependency>,
+        domainDependencies: List<RawDependency>,
+        allServicesDependencies: Value?) = splitToDependencyTypes(
+        dependencies = this?.field("dependencies")?.list().orEmpty(),
+        identifier = identifier
+    )
 
     val defaultSettingsFromProperties = DependencySettings(
         handleInternalRedirect = properties.egress.handleInternalRedirect,
@@ -90,55 +91,63 @@ fun Value?.toOutgoing(properties: SnapshotProperties): Outgoing {
             requestTimeout = Durations.fromMillis(properties.egress.commonHttp.requestTimeout.toMillis())
         )
     )
-
-    val allServicesDefaultSettings =
-        allServiceDependencies.firstOrNull()?.toSettings(defaultSettingsFromProperties) ?: defaultSettingsFromProperties
-    val dependencies = list.subtract(allServiceDependencies).map { it.toDependency(allServicesDefaultSettings) }
-    // TODO use defaultSettingsFromProperties for domains
-    val domainDependencies = dependencies.filterIsInstance<ServiceDependency>()
-    val wildcardDependency = dependencies.filterIsInstance<DomainDependency>()
-
+    val allServicesDefaultSettings = allServicesDependencies.toSettings(defaultSettingsFromProperties)
     return Outgoing(
-        serviceDependencies = domainDependencies,
-        domainDependencies = wildcardDependency,
+        serviceDependencies = serviceDependencies.map {
+            ServiceDependency(it.name, it.value.toSettings(allServicesDefaultSettings))
+        },
+        domainDependencies = domainDependencies.map {
+            DomainDependency(it.name, it.value.toSettings(defaultSettingsFromProperties))
+        },
         defaultServiceSettings = allServicesDefaultSettings,
-        allServicesDependencies = allServiceDependencies.isNotEmpty()
+        allServicesDependencies = allServicesDependencies != null
     )
 }
 
-fun Value.toDependency(defaultSettings: DependencySettings): Dependency {
-    val service = this.field("service")?.stringValue
-    val domain = this.field("domain")?.stringValue
-    val settings = toSettings(defaultSettings)
+@Suppress("ThrowsCount")
+private fun splitToDependencyTypes(
+    dependencies: List<Value>,
+    identifier: String
+): Triple<List<RawDependency>, List<RawDependency>, Value?> {
+    val services: MutableList<RawDependency> = mutableListOf()
+    val domains: MutableList<RawDependency> = mutableListOf()
+    val allServiceDependencies: MutableList<Value> = mutableListOf()
 
-    return when {
-        service == null && domain == null || service != null && domain != null ->
-            throw NodeMetadataValidationException(
-                "Define either 'service' or 'domain' as an outgoing dependency"
+    for (dependency in dependencies) {
+        val service = dependency.field("service")?.stringValue
+        val domain = dependency.field("domain")?.stringValue
+        when {
+            service == null && domain == null || service != null && domain != null ->
+                throw NodeMetadataValidationException(
+                    "Define either 'service' or 'domain' as an outgoing dependency"
+                )
+            service == identifier -> allServiceDependencies.add(dependency)
+            service != null -> services.add(RawDependency(service, dependency))
+            domain.orEmpty().startsWith("http://") -> domains.add(RawDependency(domain.orEmpty(), dependency))
+            domain.orEmpty().startsWith("https://") -> domains.add(RawDependency(domain.orEmpty(), dependency))
+            else -> throw NodeMetadataValidationException(
+                "Unsupported protocol for domain dependency for domain $domain"
             )
-        service != null -> ServiceDependency(service, settings)
-        domain.orEmpty().startsWith("http://") -> DomainDependency(domain.orEmpty(), settings)
-        domain.orEmpty().startsWith("https://") -> DomainDependency(domain.orEmpty(), settings)
-        else -> throw NodeMetadataValidationException(
-            "Unsupported protocol for domain dependency for domain $domain"
+        }
+    }
+    if (allServiceDependencies.size > 1) {
+        throw NodeMetadataValidationException(
+            "Define at most one 'wildcard service' as an outgoing dependency"
         )
     }
+    return Triple(services, domains, allServiceDependencies.firstOrNull())
 }
 
-private fun Value.toSettings(defaultSettings: DependencySettings): DependencySettings {
-    val handleInternalRedirect = this.field("handleInternalRedirect")?.boolValue
-    val timeoutPolicy = this.field("timeoutPolicy").toOutgoingTimeoutPolicy(defaultSettings.timeoutPolicy)
-    val rewriteHostHeader = this.field("rewriteHostHeader")?.boolValue
+private fun Value?.toSettings(defaultSettings: DependencySettings): DependencySettings {
+    val handleInternalRedirect = this?.field("handleInternalRedirect")?.boolValue
+    val timeoutPolicy = this?.field("timeoutPolicy")?.toOutgoingTimeoutPolicy(defaultSettings.timeoutPolicy)
+    val rewriteHostHeader = this?.field("rewriteHostHeader")?.boolValue
 
-    if (handleInternalRedirect == null &&
-        rewriteHostHeader == null &&
-        timeoutPolicy == defaultSettings.timeoutPolicy
-    ) {
-        return defaultSettings
-    }
-    return DependencySettings(
+    return if (handleInternalRedirect == null && rewriteHostHeader == null && timeoutPolicy == null) {
+        defaultSettings
+    } else DependencySettings(
         handleInternalRedirect ?: defaultSettings.handleInternalRedirect,
-        timeoutPolicy,
+        timeoutPolicy ?: defaultSettings.timeoutPolicy,
         rewriteHostHeader ?: defaultSettings.rewriteHostHeader
     )
 }
@@ -215,9 +224,9 @@ private fun Value?.toIncomingTimeoutPolicy(): Incoming.TimeoutPolicy {
     return Incoming.TimeoutPolicy(idleTimeout, responseTimeout, connectionIdleTimeout)
 }
 
-private fun Value?.toOutgoingTimeoutPolicy(default: Outgoing.TimeoutPolicy): Outgoing.TimeoutPolicy {
-    val idleTimeout = this?.field("idleTimeout")?.toDuration()
-    val requestTimeout = this?.field("requestTimeout")?.toDuration()
+private fun Value.toOutgoingTimeoutPolicy(default: Outgoing.TimeoutPolicy): Outgoing.TimeoutPolicy {
+    val idleTimeout = this.field("idleTimeout")?.toDuration()
+    val requestTimeout = this.field("requestTimeout")?.toDuration()
     if (idleTimeout == null && requestTimeout == null) {
         return default
     }
