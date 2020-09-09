@@ -1,9 +1,9 @@
 package pl.allegro.tech.servicemesh.envoycontrol.snapshot.debug
 
-import io.envoyproxy.envoy.api.v2.Cluster
-import io.envoyproxy.envoy.api.v2.ClusterLoadAssignment
-import io.envoyproxy.envoy.api.v2.Listener
-import io.envoyproxy.envoy.api.v2.RouteConfiguration
+import io.envoyproxy.envoy.config.cluster.v3.Cluster
+import io.envoyproxy.envoy.config.endpoint.v3.ClusterLoadAssignment
+import io.envoyproxy.envoy.config.listener.v3.Listener
+import io.envoyproxy.envoy.config.route.v3.RouteConfiguration
 import net.openhft.hashing.LongHashFunction
 import pl.allegro.tech.servicemesh.envoycontrol.snapshot.GlobalSnapshot
 
@@ -28,21 +28,17 @@ data class Versions(
 )
 
 data class Snapshot(
-    val clusters: Map<String, Cluster> = emptyMap(),
-    val endpoints: Map<String, ClusterLoadAssignment> = emptyMap(),
+    val clusters: Map<String, Cluster>,
+    val endpoints: Map<String, ClusterLoadAssignment>,
     val listeners: Map<String, Listener> = emptyMap(),
-    val routes: Map<String, RouteConfiguration> = emptyMap(),
-    val clustersV3: Map<String, io.envoyproxy.envoy.config.cluster.v3.Cluster> = emptyMap(),
-    val endpointsV3: Map<String, io.envoyproxy.envoy.config.endpoint.v3.ClusterLoadAssignment> = emptyMap(),
-    val listenersV3: Map<String, io.envoyproxy.envoy.config.listener.v3.Listener> = emptyMap(),
-    val routesV3: Map<String, io.envoyproxy.envoy.config.route.v3.RouteConfiguration> = emptyMap()
+    val routes: Map<String, RouteConfiguration> = emptyMap()
 )
 
 data class SnapshotDebugInfo(
     val snapshot: Snapshot,
     val versions: Versions
 ) {
-    constructor(snapshot: io.envoyproxy.controlplane.cache.v2.Snapshot) : this(
+    constructor(snapshot: io.envoyproxy.controlplane.cache.v3.Snapshot) : this(
         snapshot = Snapshot(
             clusters = snapshot.clusters().resources(),
             endpoints = snapshot.endpoints().resources(),
@@ -57,20 +53,6 @@ data class SnapshotDebugInfo(
         )
     )
 
-    constructor(snapshot: io.envoyproxy.controlplane.cache.v3.Snapshot) : this(
-            snapshot = Snapshot(
-                    clustersV3 = snapshot.clusters().resources(),
-                    endpointsV3 = snapshot.endpoints().resources(),
-                    listenersV3 = snapshot.listeners().resources(),
-                    routesV3 = snapshot.routes().resources()
-            ),
-            versions = Versions(
-                    clusters = version(snapshot.clusters().version()),
-                    endpoints = version(snapshot.endpoints().version()),
-                    listeners = version(snapshot.listeners().version()),
-                    routes = version(snapshot.routes().version())
-            )
-    )
     constructor(globalSnapshot: GlobalSnapshot) : this(
         snapshot = Snapshot(
             clusters = globalSnapshot.clusters.resources(),

@@ -2,7 +2,7 @@ package pl.allegro.tech.servicemesh.envoycontrol
 
 import io.envoyproxy.controlplane.cache.NodeGroup
 import io.envoyproxy.controlplane.cache.SnapshotCache
-import io.envoyproxy.controlplane.cache.v2.Snapshot
+import io.envoyproxy.controlplane.cache.v3.Snapshot
 import io.envoyproxy.controlplane.server.DefaultExecutorGroup
 import io.envoyproxy.controlplane.server.ExecutorGroup
 import io.envoyproxy.controlplane.server.V2DiscoveryServer
@@ -30,13 +30,13 @@ import pl.allegro.tech.servicemesh.envoycontrol.snapshot.EnvoySnapshotFactory
 import pl.allegro.tech.servicemesh.envoycontrol.snapshot.SnapshotUpdater
 import pl.allegro.tech.servicemesh.envoycontrol.snapshot.SnapshotsVersions
 import pl.allegro.tech.servicemesh.envoycontrol.snapshot.resource.endpoints.EnvoyEndpointsFactory
-import pl.allegro.tech.servicemesh.envoycontrol.snapshot.resource.listeners.EnvoyListenersFactory
 import pl.allegro.tech.servicemesh.envoycontrol.snapshot.resource.listeners.filters.AccessLogFilterFactory
 import pl.allegro.tech.servicemesh.envoycontrol.snapshot.resource.listeners.filters.EnvoyHttpFilters
+import pl.allegro.tech.servicemesh.envoycontrol.snapshot.resource.listeners.EnvoyListenersFactory
 import pl.allegro.tech.servicemesh.envoycontrol.snapshot.resource.routes.ServiceTagMetadataGenerator
 import pl.allegro.tech.servicemesh.envoycontrol.utils.DirectScheduler
 import pl.allegro.tech.servicemesh.envoycontrol.utils.ParallelScheduler
-import pl.allegro.tech.servicemesh.envoycontrol.v2.SimpleCache
+import pl.allegro.tech.servicemesh.envoycontrol.v3.SimpleCache
 import reactor.core.Disposable
 import reactor.core.publisher.Flux
 import reactor.core.scheduler.Schedulers
@@ -163,67 +163,53 @@ class ControlPlane private constructor(
 
             val groupChangeWatcher = GroupChangeWatcher(cache, metrics, meterRegistry)
 
-            val v2discoveryServer = V2DiscoveryServer(
-                listOf(
+            val meteredConnectionsCallbacks = MeteredConnectionsCallbacks().also {
+                meterRegistry.gauge("grpc.all-connections", it.connections)
+                MeteredConnectionsCallbacks.MetricsStreamType.values().map { type ->
+                    meterRegistry.gauge("grpc.connections.${type.name.toLowerCase()}", it.connections(type))
+                }
+            }
+            val loggingDiscoveryServerCallbacks = LoggingDiscoveryServerCallbacks(
+                    properties.server.logFullRequest,
+                    properties.server.logFullResponse
+            )
+
+            val snapshotCollectingCallback = SnapshotCollectingCallback(
+                    cache,
+                    nodeGroup,
+                    Clock.systemDefaultZone(),
+                    emptySet(),
+                    cleanupProperties.collectAfterMillis.toMillis(),
+                    cleanupProperties.collectionIntervalMillis.toMillis()
+            )
+
+            val cachedProtoResourcesSerializer = CachedProtoResourcesSerializer(
+                    meterRegistry,
+                    properties.server.reportProtobufCacheMetrics
+            )
+
+            val compositeCollectingCallbacks = listOf(
                     CompositeDiscoveryServerCallbacks(
-                        meterRegistry,
-                        SnapshotCollectingCallback(
-                            cache,
-                            nodeGroup,
-                            Clock.systemDefaultZone(),
-                            emptySet(),
-                            cleanupProperties.collectAfterMillis.toMillis(),
-                            cleanupProperties.collectionIntervalMillis.toMillis()
-                        ),
-                        LoggingDiscoveryServerCallbacks(
-                            properties.server.logFullRequest,
-                            properties.server.logFullResponse
-                        ),
-                        MeteredConnectionsCallbacks().also {
-                            meterRegistry.gauge("grpc.all-connections", it.connections)
-                            MeteredConnectionsCallbacks.MetricsStreamType.values().map { type ->
-                                meterRegistry.gauge("grpc.connections.${type.name.toLowerCase()}", it.connections(type))
-                            }
-                        },
-                        NodeMetadataValidator(properties.envoy.snapshot)
+                            meterRegistry,
+                            snapshotCollectingCallback,
+                            loggingDiscoveryServerCallbacks,
+                            meteredConnectionsCallbacks,
+                            NodeMetadataValidator(properties.envoy.snapshot)
                     )
-                ),
+            )
+
+            val v2discoveryServer = V2DiscoveryServer(
+                compositeCollectingCallbacks,
                 groupChangeWatcher,
                 executorGroup,
-                CachedProtoResourcesSerializer(meterRegistry, properties.server.reportProtobufCacheMetrics)
+                cachedProtoResourcesSerializer
             )
 
             val v3discoveryServer = V3DiscoveryServer(
-                    listOf(
-                            CompositeDiscoveryServerCallbacks(
-                                    meterRegistry,
-                                    SnapshotCollectingCallback(
-                                            cache,
-                                            nodeGroup,
-                                            Clock.systemDefaultZone(),
-                                            emptySet(),
-                                            cleanupProperties.collectAfterMillis.toMillis(),
-                                            cleanupProperties.collectionIntervalMillis.toMillis()
-                                    ),
-                                    LoggingDiscoveryServerCallbacks(
-                                            properties.server.logFullRequest,
-                                            properties.server.logFullResponse
-                                    ),
-                                    MeteredConnectionsCallbacks().also {
-                                        meterRegistry.gauge("grpc.all-connections", it.connections)
-                                        MeteredConnectionsCallbacks.MetricsStreamType.values().map { type ->
-                                            meterRegistry.gauge(
-                                                    "grpc.connections.${type.name.toLowerCase()}",
-                                                    it.connections(type)
-                                            )
-                                        }
-                                    },
-                                    NodeMetadataValidator(properties.envoy.snapshot)
-                            )
-                    ),
+                    compositeCollectingCallbacks,
                     groupChangeWatcher,
                     executorGroup,
-                    CachedProtoResourcesSerializer(meterRegistry, properties.server.reportProtobufCacheMetrics)
+                    cachedProtoResourcesSerializer
             )
 
             val snapshotProperties = properties.envoy.snapshot
