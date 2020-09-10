@@ -68,20 +68,21 @@ private fun getCommunicationMode(proto: Value?): CommunicationMode {
 }
 
 fun Value?.toStatusCodeFilter(accessLogFilterFactory: AccessLogFilterFactory):
-    AccessLogFilterSettings.StatusCodeFilterSettings? = this?.stringValue?.let {
-    accessLogFilterFactory.parseStatusCodeFilter(it.toUpperCase())
+    AccessLogFilterSettings.StatusCodeFilterSettings? {
+    return this?.stringValue?.let {
+        accessLogFilterFactory.parseStatusCodeFilter(it.toUpperCase())
+    }
 }
 
 private class RawDependency(val name: String, val value: Value)
 
 fun Value?.toOutgoing(properties: SnapshotProperties): Outgoing {
 
-    val identifier = properties.outgoingPermissions.allServicesDependencies.identifier
     val (serviceDependencies: List<RawDependency>,
         domainDependencies: List<RawDependency>,
         allServicesDependencies: Value?) = splitToDependencyTypes(
         dependencies = this?.field("dependencies")?.list().orEmpty(),
-        identifier = identifier
+        allServiceDependenciesIdentifier = properties.outgoingPermissions.allServicesDependencies.identifier
     )
 
     val defaultSettingsFromProperties = DependencySettings(
@@ -107,7 +108,7 @@ fun Value?.toOutgoing(properties: SnapshotProperties): Outgoing {
 @Suppress("ThrowsCount")
 private fun splitToDependencyTypes(
     dependencies: List<Value>,
-    identifier: String
+    allServiceDependenciesIdentifier: String
 ): Triple<List<RawDependency>, List<RawDependency>, Value?> {
     val services: MutableList<RawDependency> = mutableListOf()
     val domains: MutableList<RawDependency> = mutableListOf()
@@ -121,7 +122,7 @@ private fun splitToDependencyTypes(
                 throw NodeMetadataValidationException(
                     "Define either 'service' or 'domain' as an outgoing dependency"
                 )
-            service == identifier -> allServiceDependencies.add(dependency)
+            service == allServiceDependenciesIdentifier -> allServiceDependencies.add(dependency)
             service != null -> services.add(RawDependency(service, dependency))
             domain.orEmpty().startsWith("http://") -> domains.add(RawDependency(domain.orEmpty(), dependency))
             domain.orEmpty().startsWith("https://") -> domains.add(RawDependency(domain.orEmpty(), dependency))

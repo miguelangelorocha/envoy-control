@@ -558,13 +558,14 @@ class NodeMetadataTest {
         assertThat(exception.status.code).isEqualTo(Status.Code.INVALID_ARGUMENT)
     }
 
-    @Suppress("UnnecessaryApply")
-    fun ObjectAssert<DependencySettings>.hasTimeouts(idleTimeout: String, requestTimeout: String) = apply {
+    fun ObjectAssert<DependencySettings>.hasTimeouts(idleTimeout: String, requestTimeout: String): ObjectAssert<DependencySettings> {
         this.extracting { it.timeoutPolicy }.isEqualTo(Outgoing.TimeoutPolicy(
             idleTimeout = Durations.parse(idleTimeout),
             requestTimeout = Durations.parse(requestTimeout)
         ))
+        return this
     }
+
     fun List<ServiceDependency>.assertServiceDependency(name: String): ObjectAssert<DependencySettings> {
         val list = this.filter { it.service == name }
         assertThat(list).hasSize(1)
