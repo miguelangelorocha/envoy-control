@@ -74,17 +74,12 @@ fun Value?.toStatusCodeFilter(accessLogFilterFactory: AccessLogFilterFactory):
     }
 }
 
-private class RawDependency(val name: String, val value: Value)
+private class RawDependency(val service: String?, val domain: String?, val value: Value)
 
 fun Value?.toOutgoing(properties: SnapshotProperties): Outgoing {
-
-    val (serviceDependencies: List<RawDependency>,
-        domainDependencies: List<RawDependency>,
-        allServicesDependencies: Value?) = splitToDependencyTypes(
-        dependencies = this?.field("dependencies")?.list().orEmpty(),
-        allServiceDependenciesIdentifier = properties.outgoingPermissions.allServicesDependencies.identifier
-    )
-
+    val allServiceDependenciesIdentifier = properties.outgoingPermissions.allServicesDependencies.identifier
+    val rawDependencies = this?.field("dependencies")?.list().orEmpty().map(::toRawDependency)
+    val allServicesDependencies = toAllServiceDependencies(rawDependencies, allServiceDependenciesIdentifier)
     val defaultSettingsFromProperties = DependencySettings(
         handleInternalRedirect = properties.egress.handleInternalRedirect,
         timeoutPolicy = Outgoing.TimeoutPolicy(
@@ -92,51 +87,57 @@ fun Value?.toOutgoing(properties: SnapshotProperties): Outgoing {
             requestTimeout = Durations.fromMillis(properties.egress.commonHttp.requestTimeout.toMillis())
         )
     )
-    val allServicesDefaultSettings = allServicesDependencies.toSettings(defaultSettingsFromProperties)
+    val allServicesDefaultSettings = allServicesDependencies?.value.toSettings(defaultSettingsFromProperties)
+    val services = rawDependencies.filter { it.service != null && it.service != allServiceDependenciesIdentifier }
+        .map { ServiceDependency(it.service.orEmpty(), it.value.toSettings(allServicesDefaultSettings)) }
+    val domains = rawDependencies.filter { it.domain != null }.onEach(::validateDomainFormat)
+        .map { DomainDependency(it.domain.orEmpty(), it.value.toSettings(defaultSettingsFromProperties)) }
     return Outgoing(
-        serviceDependencies = serviceDependencies.map {
-            ServiceDependency(it.name, it.value.toSettings(allServicesDefaultSettings))
-        },
-        domainDependencies = domainDependencies.map {
-            DomainDependency(it.name, it.value.toSettings(defaultSettingsFromProperties))
-        },
+        serviceDependencies = services,
+        domainDependencies = domains,
         defaultServiceSettings = allServicesDefaultSettings,
         allServicesDependencies = allServicesDependencies != null
     )
 }
 
-@Suppress("ThrowsCount")
-private fun splitToDependencyTypes(
-    dependencies: List<Value>,
-    allServiceDependenciesIdentifier: String
-): Triple<List<RawDependency>, List<RawDependency>, Value?> {
-    val services: MutableList<RawDependency> = mutableListOf()
-    val domains: MutableList<RawDependency> = mutableListOf()
-    val allServiceDependencies: MutableList<Value> = mutableListOf()
-
-    for (dependency in dependencies) {
-        val service = dependency.field("service")?.stringValue
-        val domain = dependency.field("domain")?.stringValue
-        when {
-            service == null && domain == null || service != null && domain != null ->
-                throw NodeMetadataValidationException(
-                    "Define either 'service' or 'domain' as an outgoing dependency"
-                )
-            service == allServiceDependenciesIdentifier -> allServiceDependencies.add(dependency)
-            service != null -> services.add(RawDependency(service, dependency))
-            domain.orEmpty().startsWith("http://") -> domains.add(RawDependency(domain.orEmpty(), dependency))
-            domain.orEmpty().startsWith("https://") -> domains.add(RawDependency(domain.orEmpty(), dependency))
-            else -> throw NodeMetadataValidationException(
-                "Unsupported protocol for domain dependency for domain $domain"
-            )
-        }
+@Suppress("ComplexCondition")
+private fun toRawDependency(it: Value): RawDependency {
+    val service = it.field("service")?.stringValue
+    val domain = it.field("domain")?.stringValue
+    if (service == null && domain == null || service != null && domain != null) {
+        throw NodeMetadataValidationException(
+            "Define either 'service' or 'domain' as an outgoing dependency"
+        )
     }
-    if (allServiceDependencies.size > 1) {
+    return RawDependency(
+        service = service,
+        domain = domain,
+        value = it
+    )
+}
+
+private fun validateDomainFormat(
+    it: RawDependency
+) {
+    val domain = it.domain
+    if (!domain!!.startsWith("http://") && !domain.startsWith("https://")) {
+        throw NodeMetadataValidationException(
+            "Unsupported protocol for domain dependency for domain $domain"
+        )
+    }
+}
+
+private fun toAllServiceDependencies(
+    rawDependencies: List<RawDependency>,
+    allServiceDependenciesIdentifier: String
+): RawDependency? {
+    val allServicesDependencies = rawDependencies.filter { it.service == allServiceDependenciesIdentifier }.toList()
+    if (allServicesDependencies.size > 1) {
         throw NodeMetadataValidationException(
             "Define at most one 'wildcard service' as an outgoing dependency"
         )
     }
-    return Triple(services, domains, allServiceDependencies.firstOrNull())
+    return allServicesDependencies.firstOrNull()
 }
 
 private fun Value?.toSettings(defaultSettings: DependencySettings): DependencySettings {
