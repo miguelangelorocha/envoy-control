@@ -150,6 +150,21 @@ class NodeMetadataTest {
     }
 
     @Test
+    fun `should reject domain dependency with unsupported all services dependencies identifier`() {
+        // given
+        val proto = outgoingDependenciesProto {
+            withDomain(url = "*")
+        }
+        val properties = snapshotProperties(allServicesDependenciesIdentifier = "*")
+
+        // expects
+        val exception = assertThrows<NodeMetadataValidationException> { proto.toOutgoing(properties) }
+        assertThat(exception.status.description)
+            .isEqualTo("Unsupported 'all serviceDependencies identifier' for domain dependency: *")
+        assertThat(exception.status.code).isEqualTo(Status.Code.INVALID_ARGUMENT)
+    }
+
+    @Test
     fun `should accept domain dependency`() {
         // given
         val proto = outgoingDependenciesProto {
@@ -416,7 +431,7 @@ class NodeMetadataTest {
             proto.toOutgoing(snapshotProperties(allServicesDependenciesIdentifier = "*"))
         }
         assertThat(exception.status.description)
-            .isEqualTo("Define at most one 'wildcard service' as an outgoing dependency")
+            .isEqualTo("Define at most one 'all serviceDependencies identifier' as an service dependency")
         assertThat(exception.status.code).isEqualTo(Status.Code.INVALID_ARGUMENT)
     }
 

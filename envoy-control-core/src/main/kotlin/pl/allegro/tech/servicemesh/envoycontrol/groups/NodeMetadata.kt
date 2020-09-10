@@ -90,7 +90,8 @@ fun Value?.toOutgoing(properties: SnapshotProperties): Outgoing {
     val allServicesDefaultSettings = allServicesDependencies?.value.toSettings(defaultSettingsFromProperties)
     val services = rawDependencies.filter { it.service != null && it.service != allServiceDependenciesIdentifier }
         .map { ServiceDependency(it.service.orEmpty(), it.value.toSettings(allServicesDefaultSettings)) }
-    val domains = rawDependencies.filter { it.domain != null }.onEach(::validateDomainFormat)
+    val domains = rawDependencies.filter { it.domain != null }
+        .onEach { validateDomainFormat(it, allServiceDependenciesIdentifier) }
         .map { DomainDependency(it.domain.orEmpty(), it.value.toSettings(defaultSettingsFromProperties)) }
     return Outgoing(
         serviceDependencies = services,
@@ -117,10 +118,16 @@ private fun toRawDependency(it: Value): RawDependency {
 }
 
 private fun validateDomainFormat(
-    it: RawDependency
+    it: RawDependency,
+    allServiceDependenciesIdentifier: String
 ) {
-    val domain = it.domain
-    if (!domain!!.startsWith("http://") && !domain.startsWith("https://")) {
+    val domain = it.domain.orEmpty()
+    if (domain == allServiceDependenciesIdentifier) {
+        throw NodeMetadataValidationException(
+            "Unsupported 'all serviceDependencies identifier' for domain dependency: $domain"
+        )
+    }
+    if (!domain.startsWith("http://") && !domain.startsWith("https://")) {
         throw NodeMetadataValidationException(
             "Unsupported protocol for domain dependency for domain $domain"
         )
@@ -134,7 +141,7 @@ private fun toAllServiceDependencies(
     val allServicesDependencies = rawDependencies.filter { it.service == allServiceDependenciesIdentifier }.toList()
     if (allServicesDependencies.size > 1) {
         throw NodeMetadataValidationException(
-            "Define at most one 'wildcard service' as an outgoing dependency"
+            "Define at most one 'all serviceDependencies identifier' as an service dependency"
         )
     }
     return allServicesDependencies.firstOrNull()
