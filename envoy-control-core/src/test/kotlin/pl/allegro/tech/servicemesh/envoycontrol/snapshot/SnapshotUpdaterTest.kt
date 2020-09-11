@@ -92,7 +92,7 @@ class SnapshotUpdaterTest {
     fun `should generate allServicesGroup snapshots with timeouts from proxySettings`() {
         val cache = MockCache()
 
-        val allServicesGroup = AllServicesGroup(communicationMode = XDS,proxySettings = ProxySettings(outgoing = Outgoing(
+        val allServicesGroup = AllServicesGroup(communicationMode = XDS, proxySettings = ProxySettings(outgoing = Outgoing(
             serviceDependencies = listOf(ServiceDependency(
                 service = "existingService1",
                 settings = DependencySettings(timeoutPolicy = Outgoing.TimeoutPolicy(
@@ -520,7 +520,7 @@ class SnapshotUpdaterTest {
         assertThat(this.clusters().resources().keys).isEmpty()
     }
 
-    private fun Snapshot.hasVirtualHostConfig(name: String, idleTimeout:String, requestTimeout:String):Snapshot {
+    private fun Snapshot.hasVirtualHostConfig(name: String, idleTimeout: String, requestTimeout: String): Snapshot {
         val routeAction = this.routes()
             .resources()["default_routes"]!!.virtualHostsList.singleOrNull { it.name == name }?.routesList?.map { it.route }
             ?.singleOrNull()
